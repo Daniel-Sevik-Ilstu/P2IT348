@@ -1,0 +1,6 @@
+stage,n_features
+raw features,1848
+after dropping all-zero training columns,1093
+after min support >= 10 training rows,931
+dropped for low support (1 to min_support-1 non-zero rows),162
+dropped columns that are non-zero somewhere in the test years,212
