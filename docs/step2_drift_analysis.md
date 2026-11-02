@@ -118,6 +118,21 @@ Reading it:
 - Models trained on one of the years 2019-2021 do better on the next year (0.94 for 2019 -> 2020, 0.93 for 2020 -> 2021).
 - **The low cell survives the min-support filter.** Before the filter (first version of this report) the 2016 -> 2021 cell was 0.362 and the 2021 sample had max |z| = 214 under the 2016 scaler. After the filter (686 columns kept for 2016) it is 0.351, with max |z| = 41 and 50 columns above 20. So extrapolation from rare columns is not the main cause. In an ad hoc check (not in `src/`) the 2016 model labels 75% of the 2021 rows malware: it catches 60% of 2021 malware but only 10% of 2021 goodware are classified correctly. Counts of many API calls in 2021 apps are much larger than in 2016 (e.g. `StringBuilder.append(String)` mean 5,657 vs 3,409), so 2021 goodware looks like 2016 malware to a model that learned "heavy API use = malware". This is covariate shift plus a learned boundary that does not transfer; I did not test it further.
 
+## Duplicates and the diagonal (review #3)
+
+The diagonal of the accuracy matrix is a random stratified 70/30 split inside one year sample. The samples contain many exact duplicate rows (identical feature vectors), so a duplicate can land in both the training and held-out parts, and the **diagonal is optimistic** compared with the cross-year cells. Duplicates are kept (AGENTS.md); the split was not changed. Duplicate feature rows per 3,000-row sample (rows identical to an earlier row; counted with `DataFrame.duplicated` on the 1,848 features, in an ad hoc check, not in `src/`):
+
+| year | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 |
+|---|---|---|---|---|---|---|---|---|
+| duplicate rows | 508 | 688 | 770 | 1,440 | 1,632 | 1,741 | 1,845 | 1,831 |
+| share of sample | 17% | 23% | 26% | 48% | 54% | 58% | 62% | 61% |
+
+Nearly all duplicates also share the label (e.g. 2021: 1,826 of 1,831 with label included). The gap between the diagonal and the off-diagonal cells is therefore partly inflated, most for 2017-2021.
+
+## Reading `pct_significant` (review #6)
+
+`pct_significant` is computed per year pair with a Bonferroni correction over that pair's tested features only. It is a descriptive share, not a family-wise test across the 28 pairs, and should not be read as a test result across pairs. With 3,000 rows per sample, ties and duplicates, almost any real shift is significant, so `mean_ks` is the main signal.
+
 ## What this means for the models
 
 - A model trained on 2014-2016 faces test years that are increasingly far from it in feature space (mean KS against 2014 of 0.04 for 2017 up to 0.08 for 2021). Expect performance to decrease for later test years, with the largest losses on 2019-2021.
