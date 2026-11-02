@@ -236,7 +236,7 @@ def test_validate_feature_order_ok(tmp_path):
 
 
 def test_combine_years_row_count_and_columns(tmp_path):
-    make_dir(tmp_path, years=(2014, 2015, 2016), n_rows=4)
+    make_dir(tmp_path, n_rows=4)  # all 16 files: list_data_files requires the full set
     frames = {y: data.load_year(y, tmp_path) for y in (2014, 2015, 2016)}
     out = data.combine_years(frames)
     assert len(out) == sum(len(f) for f in frames.values()) == 24
@@ -248,7 +248,7 @@ def test_combine_years_row_count_and_columns(tmp_path):
 
 
 def test_combine_years_labels_balanced_per_year(tmp_path):
-    make_dir(tmp_path, years=(2014, 2015), n_rows=4)
+    make_dir(tmp_path, n_rows=4)  # all 16 files: list_data_files requires the full set
     out = data.combine_years({y: data.load_year(y, tmp_path) for y in (2014, 2015)})
     counts = out.groupby(["year", "label"]).size()
     assert (counts == 4).all()

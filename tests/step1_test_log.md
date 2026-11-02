@@ -34,8 +34,8 @@ One row per test function.
 | test_validate_feature_order_mismatched_order_raises | Swapped column order raises |
 | test_validate_feature_order_mismatched_names_raises | Different column name raises |
 | test_validate_feature_order_ok | Identical features pass |
-| test_combine_years_row_count_and_columns | Combined rows = sum of inputs; ignore_index; 1,850 columns; years in order |
-| test_combine_years_labels_balanced_per_year | Per-year/class counts preserved |
+| test_combine_years_row_count_and_columns | Full 16-file synthetic folder; combining years 2014-2016: rows = sum of inputs; ignore_index; 1,850 columns; years in order |
+| test_combine_years_labels_balanced_per_year | Full 16-file synthetic folder; combining 2014-2015: per-year/class counts preserved |
 | test_combine_years_mismatched_features_raises | combine_years validates feature order |
 | test_load_all_synthetic_end_to_end | load_all on 16 synthetic files: row total, all years, both labels, no apkname, no NaN |
 | test_cache_key_changes_when_file_changes | cache_key is stable and changes with file size |
@@ -184,4 +184,127 @@ PASSED tests/test_step1_data.py::test_real_year_sizes_labels_and_nan[2019]
 FAILED tests/test_step1_data.py::test_combine_years_row_count_and_columns - V...
 FAILED tests/test_step1_data.py::test_combine_years_labels_balanced_per_year
 ================== 2 failed, 42 passed, 2 warnings in 18.12s ==================
+```
+
+### Run 2: PASSED
+
+- Time: 2026-11-02T09:56:27+02:00
+- Commit: 15a3857
+- Result: 44 passed, 2 warnings in 5.27s
+- Files: test_step1_data.py
+
+```
+============================= test session starts =============================
+platform win32 -- Python 3.11.4, pytest-9.2.0, pluggy-1.7.0 -- C:\Program Files\Python311\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\thema\OneDrive\Desktop\Project2\project2-harness2\project2-harness2
+configfile: pytest.ini
+plugins: anyio-4.8.0, dash-2.18.1
+collecting ... collected 44 items
+
+tests/test_step1_data.py::test_parse_filename_valid[sampled_2014_malware_api.csv-expected0] PASSED [  2%]
+tests/test_step1_data.py::test_parse_filename_valid[sampled_2021_benign_api.csv-expected1] PASSED [  4%]
+tests/test_step1_data.py::test_parse_filename_valid[sampled_2017_malware_api.csv-expected2] PASSED [  6%]
+tests/test_step1_data.py::test_parse_filename_invalid_raises[sampled_2013_malware_api.csv] PASSED [  9%]
+tests/test_step1_data.py::test_parse_filename_invalid_raises[sampled_2022_benign_api.csv] PASSED [ 11%]
+tests/test_step1_data.py::test_parse_filename_invalid_raises[sampled_2015_goodware_api.csv] PASSED [ 13%]
+tests/test_step1_data.py::test_parse_filename_invalid_raises[sampled_2015_malware_api.csv.bak] PASSED [ 15%]
+tests/test_step1_data.py::test_parse_filename_invalid_raises[sampled_2015_malware.csv] PASSED [ 18%]
+tests/test_step1_data.py::test_parse_filename_invalid_raises[notes.csv] PASSED [ 20%]
+tests/test_step1_data.py::test_parse_filename_invalid_raises[] PASSED    [ 22%]
+tests/test_step1_data.py::test_parse_filename_rejects_directory_path PASSED [ 25%]
+tests/test_step1_data.py::test_load_file_drops_first_column PASSED       [ 27%]
+tests/test_step1_data.py::test_load_file_has_1848_features_plus_label_year PASSED [ 29%]
+tests/test_step1_data.py::test_load_file_label_and_year_from_filename[sampled_2015_malware_api.csv-1-2015] PASSED [ 31%]
+tests/test_step1_data.py::test_load_file_label_and_year_from_filename[sampled_2019_benign_api.csv-0-2019] PASSED [ 34%]
+tests/test_step1_data.py::test_load_file_dtypes PASSED                   [ 36%]
+tests/test_step1_data.py::test_load_file_does_not_assume_row_count PASSED [ 38%]
+tests/test_step1_data.py::test_load_file_wrong_column_count_raises PASSED [ 40%]
+tests/test_step1_data.py::test_load_file_extra_column_raises PASSED      [ 43%]
+tests/test_step1_data.py::test_load_file_wrong_first_column_raises PASSED [ 45%]
+tests/test_step1_data.py::test_load_file_bad_filename_raises PASSED      [ 47%]
+tests/test_step1_data.py::test_load_file_negative_value_raises PASSED    [ 50%]
+tests/test_step1_data.py::test_load_file_missing_value_raises PASSED     [ 52%]
+tests/test_step1_data.py::test_load_file_no_missing_values_on_valid_input PASSED [ 54%]
+tests/test_step1_data.py::test_load_file_all_zero_feature_kept PASSED    [ 56%]
+tests/test_step1_data.py::test_read_apknames_returns_ids_only PASSED     [ 59%]
+tests/test_step1_data.py::test_list_data_files_returns_16_sorted PASSED  [ 61%]
+tests/test_step1_data.py::test_list_data_files_stray_csv_raises PASSED   [ 63%]
+tests/test_step1_data.py::test_list_data_files_missing_file_raises PASSED [ 65%]
+tests/test_step1_data.py::test_list_data_files_empty_dir_raises PASSED   [ 68%]
+tests/test_step1_data.py::test_load_year_combines_both_classes PASSED    [ 70%]
+tests/test_step1_data.py::test_validate_feature_order_mismatched_order_raises PASSED [ 72%]
+tests/test_step1_data.py::test_validate_feature_order_mismatched_names_raises PASSED [ 75%]
+tests/test_step1_data.py::test_validate_feature_order_ok PASSED          [ 77%]
+tests/test_step1_data.py::test_combine_years_row_count_and_columns PASSED [ 79%]
+tests/test_step1_data.py::test_combine_years_labels_balanced_per_year PASSED [ 81%]
+tests/test_step1_data.py::test_combine_years_mismatched_features_raises PASSED [ 84%]
+tests/test_step1_data.py::test_load_all_synthetic_end_to_end PASSED      [ 86%]
+tests/test_step1_data.py::test_cache_key_changes_when_file_changes PASSED [ 88%]
+tests/test_step1_data.py::test_cache_key_changes_with_mtime PASSED       [ 90%]
+tests/test_step1_data.py::test_train_duplicate_mask_flags_test_row_equal_to_train_row PASSED [ 93%]
+tests/test_step1_data.py::test_real_16_files_and_columns PASSED          [ 95%]
+tests/test_step1_data.py::test_real_year_sizes_labels_and_nan[2014] PASSED [ 97%]
+tests/test_step1_data.py::test_real_year_sizes_labels_and_nan[2019] PASSED [100%]
+
+============================== warnings summary ===============================
+..\..\..\..\..\AppData\Roaming\Python\Python311\site-packages\dash\testing\plugin.py:92
+  C:\Users\thema\AppData\Roaming\Python\Python311\site-packages\dash\testing\plugin.py:92: PytestRemovedIn10Warning: The hookimpl pytest_addhooks uses old-style configuration options (marks or attributes).
+  Please use the pytest.hookimpl(tryfirst=True) decorator instead
+   to configure the hooks.
+   See https://docs.pytest.org/en/latest/deprecations.html#configuring-hook-specs-impls-using-markers
+    @pytest.mark.tryfirst
+
+tests/test_step1_data.py::test_load_file_missing_value_raises
+  C:\Users\thema\AppData\Roaming\Python\Python311\site-packages\pandas\io\parsers\c_parser_wrapper.py:234: RuntimeWarning: invalid value encountered in cast
+    chunks = self._reader.read_low_memory(nrows)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_step1_data.py::test_parse_filename_valid[sampled_2014_malware_api.csv-expected0]
+PASSED tests/test_step1_data.py::test_parse_filename_valid[sampled_2021_benign_api.csv-expected1]
+PASSED tests/test_step1_data.py::test_parse_filename_valid[sampled_2017_malware_api.csv-expected2]
+PASSED tests/test_step1_data.py::test_parse_filename_invalid_raises[sampled_2013_malware_api.csv]
+PASSED tests/test_step1_data.py::test_parse_filename_invalid_raises[sampled_2022_benign_api.csv]
+PASSED tests/test_step1_data.py::test_parse_filename_invalid_raises[sampled_2015_goodware_api.csv]
+PASSED tests/test_step1_data.py::test_parse_filename_invalid_raises[sampled_2015_malware_api.csv.bak]
+PASSED tests/test_step1_data.py::test_parse_filename_invalid_raises[sampled_2015_malware.csv]
+PASSED tests/test_step1_data.py::test_parse_filename_invalid_raises[notes.csv]
+PASSED tests/test_step1_data.py::test_parse_filename_invalid_raises[]
+PASSED tests/test_step1_data.py::test_parse_filename_rejects_directory_path
+PASSED tests/test_step1_data.py::test_load_file_drops_first_column
+PASSED tests/test_step1_data.py::test_load_file_has_1848_features_plus_label_year
+PASSED tests/test_step1_data.py::test_load_file_label_and_year_from_filename[sampled_2015_malware_api.csv-1-2015]
+PASSED tests/test_step1_data.py::test_load_file_label_and_year_from_filename[sampled_2019_benign_api.csv-0-2019]
+PASSED tests/test_step1_data.py::test_load_file_dtypes
+PASSED tests/test_step1_data.py::test_load_file_does_not_assume_row_count
+PASSED tests/test_step1_data.py::test_load_file_wrong_column_count_raises
+PASSED tests/test_step1_data.py::test_load_file_extra_column_raises
+PASSED tests/test_step1_data.py::test_load_file_wrong_first_column_raises
+PASSED tests/test_step1_data.py::test_load_file_bad_filename_raises
+PASSED tests/test_step1_data.py::test_load_file_negative_value_raises
+PASSED tests/test_step1_data.py::test_load_file_missing_value_raises
+PASSED tests/test_step1_data.py::test_load_file_no_missing_values_on_valid_input
+PASSED tests/test_step1_data.py::test_load_file_all_zero_feature_kept
+PASSED tests/test_step1_data.py::test_read_apknames_returns_ids_only
+PASSED tests/test_step1_data.py::test_list_data_files_returns_16_sorted
+PASSED tests/test_step1_data.py::test_list_data_files_stray_csv_raises
+PASSED tests/test_step1_data.py::test_list_data_files_missing_file_raises
+PASSED tests/test_step1_data.py::test_list_data_files_empty_dir_raises
+PASSED tests/test_step1_data.py::test_load_year_combines_both_classes
+PASSED tests/test_step1_data.py::test_validate_feature_order_mismatched_order_raises
+PASSED tests/test_step1_data.py::test_validate_feature_order_mismatched_names_raises
+PASSED tests/test_step1_data.py::test_validate_feature_order_ok
+PASSED tests/test_step1_data.py::test_combine_years_row_count_and_columns
+PASSED tests/test_step1_data.py::test_combine_years_labels_balanced_per_year
+PASSED tests/test_step1_data.py::test_combine_years_mismatched_features_raises
+PASSED tests/test_step1_data.py::test_load_all_synthetic_end_to_end
+PASSED tests/test_step1_data.py::test_cache_key_changes_when_file_changes
+PASSED tests/test_step1_data.py::test_cache_key_changes_with_mtime
+PASSED tests/test_step1_data.py::test_train_duplicate_mask_flags_test_row_equal_to_train_row
+PASSED tests/test_step1_data.py::test_real_16_files_and_columns
+PASSED tests/test_step1_data.py::test_real_year_sizes_labels_and_nan[2014]
+PASSED tests/test_step1_data.py::test_real_year_sizes_labels_and_nan[2019]
+======================= 44 passed, 2 warnings in 5.27s ========================
 ```
