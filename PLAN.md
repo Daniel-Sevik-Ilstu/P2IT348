@@ -24,10 +24,10 @@ Data facts used here come from AGENTS.md. Nothing in this plan has been run yet;
 6. Step 2 (KS tests, accuracy matrix) is descriptive. Its output is never used to select features, hyperparameters or the split.
 
 ### Conventions (from AGENTS.md)
-random_state=42; features as float32/int32; pathlib paths relative to the repo root; docstrings and type hints on every function; one module per concern; cache in a git-ignored `cache/` folder (the loader may cache the combined matrix as `.npy`); small commits tagged `[builder]`.
+random_state=42; features as float32/int32; pathlib paths relative to the repo root; docstrings and type hints on every function; one module per concern; cache in the git-ignored `cache/` folder (see `load_all` in Step 1 for the cache rules); small commits tagged `[builder]`.
 
 ### Shared constants (`src/config.py`)
-`ROOT`, `DATA_DIR`, `RESULTS_DIR`, `DOCS_DIR`, `SEED = 42`, `MIN_SUPPORT = 10`, `TRAIN_YEARS = (2014, 2015, 2016)`, `TEST_YEARS = (2017, ..., 2021)`, `TUNE_TRAIN_YEARS = (2014, 2015)`, `TUNE_VAL_YEAR = 2016`, `N_RAW_COLUMNS = 1849`, `LABEL_COL = "label"`, `YEAR_COL = "year"`.
+`ROOT`, `DATA_DIR`, `RESULTS_DIR`, `DOCS_DIR`, `SEED = 42`, `MIN_SUPPORT = 10`, `CACHE_DIR`, `CACHE_SCHEMA_VERSION`, `TRAIN_YEARS = (2014, 2015, 2016)`, `TEST_YEARS = (2017, ..., 2021)`, `TUNE_TRAIN_YEARS = (2014, 2015)`, `TUNE_VAL_YEAR = 2016`, `N_RAW_COLUMNS = 1849`, `LABEL_COL = "label"`, `YEAR_COL = "year"`.
 
 ### Entry point (`src/main.py`)
 `main(argv: list[str] | None = None) -> int`. `python -m src.main` runs Steps 1-7 in order; `--step N` (1-7) runs one step (running it first runs any earlier step it needs, using the cache). Prints a short summary, writes `results/`. Target: under about 15 minutes in total (see runtime notes per step).
@@ -46,7 +46,8 @@ random_state=42; features as float32/int32; pathlib paths relative to the repo r
 - `load_year(year: int, data_dir: Path = DATA_DIR) -> pd.DataFrame`: concatenates that year's malware and benign files.
 - `validate_feature_order(frames: list[pd.DataFrame]) -> None`: raises if any frame's feature columns differ from the first one in names or order.
 - `combine_years(frames: dict[int, pd.DataFrame]) -> pd.DataFrame`: concatenates years in order (calls `validate_feature_order`); `ignore_index=True`.
-- `load_all(data_dir: Path = DATA_DIR, use_cache: bool = True) -> pd.DataFrame`: the whole dataset (~100,000 x 1,850 incl. label, year).
+- `load_all(data_dir: Path = DATA_DIR, use_cache: bool = True) -> pd.DataFrame`: the whole dataset (~100,000 x 1,850 incl. label, year). Cache rules: stored in `cache/` (git-ignored; `CACHE_DIR` in `src/config.py`). The cache key is a hash of each CSV's file name, size and mtime plus `CACHE_SCHEMA_VERSION` (a constant bumped whenever `src/data.py` changes how data is built). The cache file holds the feature column names with the arrays; on every cache load the schema checks run again (1,848 feature columns in the stored order, `label`/`year` present, no negatives). A key mismatch or failed check rebuilds from the CSVs. If this proves complicated, the cache is dropped rather than weakened.
+- `cache_key(data_dir: Path) -> str`: the hash described above (used by `load_all`).
 - `feature_columns(df: pd.DataFrame) -> list[str]`: all columns except `label` and `year` (1,848 names).
 - `summarize_data(df: pd.DataFrame, data_dir: Path = DATA_DIR) -> pd.DataFrame`: one row per year: files loaded, rows, feature columns, malware count, benign count, exact duplicate rows, all-zero feature columns, apknames repeated within the year, and the number of rows in the year whose feature vector also occurs in an earlier year, and (test years) the number and share of rows whose feature vector occurs in 2014-2016.
 - `train_duplicate_mask(df: pd.DataFrame, train_years=TRAIN_YEARS) -> np.ndarray`: boolean mask over all rows of `df`, True where the row's exact feature vector also occurs in a training-year row (for training-year rows themselves it is not used). Used by Steps 1, 5 and 6.
@@ -54,7 +55,7 @@ random_state=42; features as float32/int32; pathlib paths relative to the repo r
 
 **Report.** `docs/step1_data_summary.md`: files per year, real row counts (not 1,500), 1,849 raw columns and 1,848 features after dropping `apkname`, malware/benign counts per year, duplicate/overlap audit, dtype and memory use. Table also saved to `results/step1_data_summary.csv`.
 
-**Testing.** Synthetic CSVs in `tmp_path`: `parse_filename` accepts valid names and rejects bad ones (wrong year, wrong class, extra suffix, path with directories); `load_file` drops the first column, gives 1,848 features, correct label from name, wrong column count raises; mismatched feature order raises; `combine_years` row count equals the sum of inputs; label and year columns are right. Integration test (skipped if `input_data/` is absent): 16 files, 1,849 raw columns each, 18,000 rows per year for 2014-2018 and 3,000 for 2019-2021, equal malware and benign counts, no NaN.
+**Testing.** Synthetic CSVs in `tmp_path`: `parse_filename` accepts valid names and rejects bad ones (wrong year, wrong class, extra suffix, path with directories); `load_file` drops the first column, gives 1,848 features, correct label from name, wrong column count raises; mismatched feature order raises; `combine_years` row count equals the sum of inputs; label and year columns are right. Cache: `cache_key` changes when a file's size or mtime changes or the schema version changes; a second `load_all` returns an equal frame; touching a CSV forces a rebuild; a cache with altered column names or order is rejected. Integration test (skipped if `input_data/` is absent): 16 files, 1,849 raw columns each, 18,000 rows per year for 2014-2018 and 3,000 for 2019-2021, equal malware and benign counts, no NaN.
 
 ---
 
