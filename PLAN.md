@@ -34,6 +34,25 @@ random_state=42; features as float32/int32; pathlib paths relative to the repo r
 
 ---
 
+## Changes after review
+
+Source: `reviews/step0_plan_review.md` (Decision log). Comment 10 was Rejected and is not applied.
+
+| Comment | Change in PLAN.md |
+|---|---|
+| 1 | SGD no longer uses `class_weight` (rejected by `partial_fit`); test must call `partial_fit` on `build_model("sgd")`. |
+| 2 | Section 0: explicit exemption; `concept_drift_matrix` fits on single years, leakage tests skip `drift.py`. |
+| 3 | `MIN_SUPPORT = 10`: keep columns non-zero in at least 10 training rows; documented in step 3 report; near-constant column test. |
+| 4 | Step 1 reports test rows duplicated in 2014-2016 (`train_duplicate_mask`); Steps 5 and 6 add a no-duplicate sensitivity row; main results keep all rows. |
+| 5 | `check_no_overlap` also requires `max(train_years) < min(test_years)`; Step 2 matrix exempt. |
+| 6 | Cache keyed on file names, sizes, mtimes and schema version; column names stored; schema checks rerun on load; stored in git-ignored `cache/`. |
+| 7 | `train_all_from_split` moved into the Step 4 function list; Step 7 guard is `window_years` plus `check_no_overlap`. |
+| 8 | Step 7 report notes the row-count imbalance and lists each window's year composition. No equal-rows variant. |
+| 9 | Step 2 report caveat: duplicates and ties inflate KS p-values; effect size is the main signal. |
+| 11 | `list_data_files` runs `parse_filename` on every CSV so stray files raise; stray-file test added. |
+
+---
+
 ## Step 1: Prepare the data (`src/data.py`)
 
 **Approach.** Read the 16 CSVs, take year and class only from the file name, drop `apkname`, add `label` (malware=1, benign=0) and `year`, validate the schema, and combine.
@@ -77,7 +96,7 @@ random_state=42; features as float32/int32; pathlib paths relative to the repo r
 
 **Runtime.** 7 + 7 year pairs x ~1,800 `ks_2samp` calls on 3,000 points is well under a minute.
 
-**Caveat to state in the report.** With 3,000 samples per year the KS test is very sensitive, so most features may be "significant" after Bonferroni; the mean KS statistic (effect size) is the more useful number. Features all-zero in both samples are skipped and reported as a count.
+**Caveat to state in the report.** With 3,000 samples per year the KS test is very sensitive, so most features may be "significant" after Bonferroni; the mean KS statistic (effect size) is the more useful number. Features all-zero in both samples are skipped and reported as a count. Duplicate rows (many in 2014-2018) and heavily tied count data mean the samples are not independent, so KS p-values and "share significant" are inflated; the KS statistic (effect size) is the main signal. The subsampling is unchanged.
 
 **Report.** `docs/step2_drift_analysis.md`: method, sample size, skipped counts, table of mean KS and share significant per pair, top-20 drifting features (Dalvik signatures), which years differ most, the accuracy matrix and what it says about concept drift.
 
@@ -178,7 +197,9 @@ For t=2017 the windows in (b) and (c) are both 2014-2016, so (a)-(c) agree on 20
 
 **Assumption to state.** Labels for year t become available only after year t ends (test-then-train); a real labeling delay would hurt (d), (b) and (c) in practice. The report states this. Not simulated here.
 
-**Report.** `docs/step7_sustainable_approach.md`: the four strategies, the table of F1/accuracy per year, comparison with the static model, cost (training time per strategy), conclusions that feed the one-page report.
+**Row-count imbalance (to state in the report).** Years 2014-2018 have 18,000 rows each and 2019-2021 have 3,000, so the expanding window is dominated by old data and the 3-year window for 2021 (2018-2020) is 18,000 of 24,000 rows from 2018. The report notes that "retraining helps or not" may partly reflect this row-count imbalance rather than recency alone, and lists each window's year composition (rows per year in the training window for every strategy and test year; also saved as `results/step7_window_composition.csv`). No equal-rows variant is run.
+
+**Report.** `docs/step7_sustainable_approach.md`: the four strategies, the table of F1/accuracy per year, the window composition table and the imbalance note above, comparison with the static model, cost (training time per strategy), conclusions that feed the one-page report.
 
 **Testing.** Synthetic multi-year frame with an injected drift (class boundary shifts each year): `window_years` returns exactly the specified years (including edge cases t=2017 and t=2021); for every strategy and every t, `max(window) < t` (the no-test-year-in-training check, run through a spy that records the years passed to `fit`); `run_incremental` records predictions on t before `partial_fit` on t (verified with a stub model that logs call order and, separately, by checking the year-t labels are not seen at prediction time); static results are identical to the Step 6 model's results; result tables have one row per test year per strategy and the expected columns; on the injected-drift data the retraining/incremental strategies do not do worse than the static one in the final year (sanity check, not a performance claim).
 
