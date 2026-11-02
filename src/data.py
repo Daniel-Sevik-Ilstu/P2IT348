@@ -1,6 +1,7 @@
 """Step 1: load the 16 CSV files, drop apkname, add label and year, combine."""
 from __future__ import annotations
 
+import hashlib
 import re
 from pathlib import Path
 
@@ -9,6 +10,9 @@ import pandas as pd
 
 from src.config import (
     ALL_YEARS,
+    CACHE_DIR,
+    CACHE_SCHEMA_VERSION,
+    TRAIN_YEARS,
     ID_COL,
     LABEL_COL,
     N_RAW_COLUMNS,
@@ -138,3 +142,190 @@ def combine_years(frames: dict[int, pd.DataFrame]) -> pd.DataFrame:
     ordered = [frames[y] for y in sorted(frames)]
     validate_feature_order(ordered)
     return pd.concat(ordered, ignore_index=True)
+
+
+def check_schema(df: pd.DataFrame, expected_features: list[str]) -> None:
+    """Raise ValueError unless df has exactly the expected features (in order), label, year, no negatives."""
+    if feature_columns(df) != expected_features:
+        raise ValueError("Feature columns differ from the CSV header (names or order)")
+    if len(expected_features) != N_RAW_COLUMNS - 1:
+        raise ValueError(f"Expected {N_RAW_COLUMNS - 1} feature columns, found {len(expected_features)}")
+    if LABEL_COL not in df.columns or YEAR_COL not in df.columns:
+        raise ValueError("label or year column missing")
+    if int(df[expected_features].to_numpy().min(initial=0)) < 0:
+        raise ValueError("Negative feature values")
+
+
+def cache_key(data_dir: Path = DATA_DIR) -> str:
+    """Hash of every CSV name, size and mtime plus CACHE_SCHEMA_VERSION."""
+    h = hashlib.sha256(f"schema={CACHE_SCHEMA_VERSION}".encode())
+    for path in list_data_files(data_dir):
+        st = path.stat()
+        h.update(f"|{path.name}:{st.st_size}:{st.st_mtime_ns}".encode())
+    return h.hexdigest()[:16]
+
+
+def _cache_path(key: str, cache_dir: Path) -> Path:
+    """Cache file location for a key."""
+    return Path(cache_dir) / f"step1_data_{key}.npz"
+
+
+def _write_cache(df: pd.DataFrame, key: str, cache_dir: Path) -> None:
+    """Store features (int32), label, year and the feature column names; drop stale caches."""
+    cache_dir = Path(cache_dir)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    for old in cache_dir.glob("step1_data_*.npz"):
+        old.unlink()
+    feats = feature_columns(df)
+    np.savez(
+        _cache_path(key, cache_dir),
+        X=df[feats].to_numpy(dtype=np.int32),
+        label=df[LABEL_COL].to_numpy(),
+        year=df[YEAR_COL].to_numpy(),
+        columns=np.array(feats, dtype=str),
+        key=np.array(key),
+    )
+
+
+def _read_cache(key: str, cache_dir: Path) -> pd.DataFrame | None:
+    """Return the cached frame, or None if missing, stale or unreadable."""
+    path = _cache_path(key, cache_dir)
+    if not path.exists():
+        return None
+    try:
+        with np.load(path, allow_pickle=False) as z:
+            if str(z["key"]) != key:
+                return None
+            feats = [str(c) for c in z["columns"]]
+            feature_df = pd.DataFrame(z["X"], columns=feats)
+            extra = pd.DataFrame({LABEL_COL: z["label"].astype(np.int8), YEAR_COL: z["year"].astype(np.int16)})
+    except (OSError, ValueError, KeyError):
+        return None
+    return pd.concat([feature_df, extra], axis=1)
+
+
+def load_all(
+    data_dir: Path = DATA_DIR, use_cache: bool = True, cache_dir: Path = CACHE_DIR
+) -> pd.DataFrame:
+    """Load the whole dataset (rows x 1,848 features + label + year).
+
+    With use_cache the combined frame is stored in cache/ keyed on file names,
+    sizes, mtimes and the schema version. On every cache load the schema is
+    re-checked against the first CSV header; a key mismatch or failed check
+    rebuilds from the CSVs.
+    """
+    files = list_data_files(data_dir)
+    reference = read_header(files[0])
+    _check_header(reference, files[0])
+    expected = reference[1:]
+    key = cache_key(data_dir)
+    if use_cache:
+        cached = _read_cache(key, cache_dir)
+        if cached is not None:
+            try:
+                check_schema(cached, expected)
+                return cached
+            except ValueError:
+                pass  # corrupt or altered cache: rebuild below
+    frames = {y: load_year(y, data_dir) for y in ALL_YEARS}
+    df = combine_years(frames)
+    check_schema(df, expected)
+    if use_cache:
+        _write_cache(df, key, cache_dir)
+    return df
+
+
+def _row_hashes(df: pd.DataFrame) -> np.ndarray:
+    """64-bit hash of each row feature vector (collision odds negligible at ~1e5 rows)."""
+    return pd.util.hash_pandas_object(df[feature_columns(df)], index=False).to_numpy()
+
+
+def train_duplicate_mask(df: pd.DataFrame, train_years: tuple[int, ...] = TRAIN_YEARS) -> np.ndarray:
+    """Boolean mask over df: True where a non-training row feature vector also occurs in a training-year row.
+
+    Training-year rows themselves are always False (the mask is for test rows).
+    """
+    hashes = _row_hashes(df)
+    in_train = df[YEAR_COL].isin(train_years).to_numpy()
+    mask = np.isin(hashes, hashes[in_train])
+    return mask & ~in_train
+
+
+def summarize_data(df: pd.DataFrame, data_dir: Path = DATA_DIR) -> pd.DataFrame:
+    """One row per year: counts plus the duplicate / overlap / all-zero audit.
+
+    Columns: year, files, rows, feature_columns, malware, benign,
+    duplicate_rows (feature vector already seen earlier in the same year),
+    all_zero_columns (zero in every row of the year), repeated_apknames (rows
+    whose apkname already appeared earlier in the year), rows_in_earlier_years
+    (feature vector occurs in an earlier year), test_rows_in_train and
+    test_share_in_train (test years only: vector occurs in 2014-2016).
+    """
+    feats = feature_columns(df)
+    hashes = _row_hashes(df)
+    years = df[YEAR_COL].to_numpy()
+    dup_train = train_duplicate_mask(df)
+    files = list_data_files(data_dir)
+    rows = []
+    for year in ALL_YEARS:
+        sel = years == year
+        sub = df.loc[sel]
+        year_files = [p for p in files if parse_filename(p.name)[0] == year]
+        apknames = pd.concat([read_apknames(p) for p in year_files], ignore_index=True)
+        earlier = np.isin(hashes[sel], hashes[years < year])
+        is_test = year not in TRAIN_YEARS
+        n = int(sel.sum())
+        rows.append(
+            {
+                "year": year,
+                "files": len(year_files),
+                "rows": n,
+                "feature_columns": len(feats),
+                "malware": int((sub[LABEL_COL] == 1).sum()),
+                "benign": int((sub[LABEL_COL] == 0).sum()),
+                "duplicate_rows": int(pd.Series(hashes[sel]).duplicated().sum()),
+                "all_zero_columns": int((~sub[feats].to_numpy().any(axis=0)).sum()),
+                "repeated_apknames": int(apknames.duplicated().sum()),
+                "rows_in_earlier_years": int(earlier.sum()),
+                "test_rows_in_train": int(dup_train[sel].sum()) if is_test else np.nan,
+                "test_share_in_train": float(dup_train[sel].sum() / n) if is_test else np.nan,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def file_table(df: pd.DataFrame, data_dir: Path = DATA_DIR) -> pd.DataFrame:
+    """One row per file: file, year, class, rows, columns after the drop (features only)."""
+    out = []
+    n_features = len(feature_columns(df))
+    for path in list_data_files(data_dir):
+        year, label = parse_filename(path.name)
+        rows = int(((df[YEAR_COL] == year) & (df[LABEL_COL] == label)).sum())
+        out.append(
+            {
+                "file": path.name,
+                "year": year,
+                "class": "malware" if label == 1 else "benign",
+                "rows": rows,
+                "columns_after_drop": n_features,
+            }
+        )
+    return pd.DataFrame(out)
+
+
+def _to_markdown(df: pd.DataFrame) -> str:
+    """Render a DataFrame as a GitHub Markdown table (no tabulate dependency)."""
+    cols = list(df.columns)
+    lines = ["| " + " | ".join(cols) + " |", "|" + "|".join("---" for _ in cols) + "|"]
+    for _, row in df.iterrows():
+        cells = ["" if pd.isna(v) else (f"{v:.4f}" if isinstance(v, float) else str(v)) for v in row]
+        lines.append("| " + " | ".join(cells) + " |")
+    return "\n".join(lines) + "\n"
+
+
+def write_data_summary(summary: pd.DataFrame, path: Path) -> None:
+    """Write summary to <path>.csv and <path>.md (path is given without extension)."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    summary.to_csv(path.with_suffix(".csv"), index=False)
+    path.with_suffix(".md").write_text(_to_markdown(summary), encoding="utf-8")
