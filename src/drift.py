@@ -43,7 +43,17 @@ def subsample_years(df: pd.DataFrame, n: int | None = None, seed: int = SEED) ->
 
 
 def ks_feature_table(a: pd.DataFrame, b: pd.DataFrame, features: list[str]) -> pd.DataFrame:
-    """Run ks_2samp on each feature; features constant with the same value in both samples are skipped."""
+    """Run ks_2samp on each feature; features constant with the same value in both samples are skipped.
+
+    Raises ValueError if either sample is empty, the feature list is empty, or a feature is missing from a sample.
+    """
+    if len(a) == 0 or len(b) == 0:
+        raise ValueError("both samples must be non-empty")
+    if len(features) == 0:
+        raise ValueError("feature list is empty")
+    missing = [f for f in features if f not in a.columns or f not in b.columns]
+    if missing:
+        raise ValueError(f"{len(missing)} feature(s) missing from a sample, e.g. {missing[0]!r}")
     xa = a[features].to_numpy()
     xb = b[features].to_numpy()
     stat = np.full(len(features), np.nan)
