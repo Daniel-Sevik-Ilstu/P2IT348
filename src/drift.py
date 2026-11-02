@@ -67,7 +67,11 @@ def ks_feature_table(a: pd.DataFrame, b: pd.DataFrame, features: list[str]) -> p
         if ca.min() == ca.max() and cb.min() == cb.max() and ca[0] == cb[0]:
             skipped[k] = True
             continue
-        res = ks_2samp(ca, cb)  # default method="auto" (exact for small samples, asymptotic otherwise)
+        with warnings.catch_warnings():
+            # method="auto" tries the exact calculation and falls back to asymptotic when it is
+            # unsuccessful (heavily tied counts); scipy warns on each fallback, which is expected here.
+            warnings.filterwarnings("ignore", message="ks_2samp: Exact calculation unsuccessful")
+            res = ks_2samp(ca, cb)
         stat[k], pval[k] = res.statistic, res.pvalue
     tested = ~skipped
     if np.isnan(stat[tested]).any() or np.isnan(pval[tested]).any():
