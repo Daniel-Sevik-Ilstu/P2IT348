@@ -50,6 +50,8 @@ One row per failing test. Decision is "Accepted" (the test is right; the builder
 
 | Test | Cause | Decision | Fixed in commit |
 | --- | --- | --- | --- |
+| test_combine_years_row_count_and_columns | Test builds a folder with only 2014 and 2015, but list_data_files requires all 16 files by design (PLAN.md Step 1). The test setup is wrong, not the code. | Rejected | |
+| test_combine_years_labels_balanced_per_year | Same cause: a two-year folder fails the 16-file check inside load_year. | Rejected | |
 
 ## Runs (added by `python harness.py test N`; do not edit)
 
