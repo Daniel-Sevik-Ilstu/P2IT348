@@ -1,6 +1,7 @@
 """Step 1: load the 16 CSV files, drop apkname, add label and year, combine."""
 from __future__ import annotations
 
+import csv
 import hashlib
 import re
 from pathlib import Path
@@ -65,7 +66,9 @@ def list_data_files(data_dir: Path = DATA_DIR) -> list[Path]:
 
 def read_header(path: Path) -> list[str]:
     """Return the CSV header (all 1,849 raw column names) without reading rows."""
-    return list(pd.read_csv(path, nrows=0).columns)
+    # csv module keeps raw names; pandas would rename duplicates (f -> f.1).
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        return next(csv.reader(f))
 
 
 def _check_header(header: list[str], path: Path) -> None:
