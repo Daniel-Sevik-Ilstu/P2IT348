@@ -30,3 +30,14 @@ One row per comment above, with the same number. Decision is Accepted or Rejecte
 
 | # | Decision | Reason | Fixed in commit |
 | --- | --- | --- | --- |
+| 1 | Accepted | Verified myself: SGDClassifier with class_weight balanced raises ValueError on partial_fit, so Step 7 would crash. Drop class_weight from SGD (data is balanced per year) and add a test that calls partial_fit on the model returned by build_model. | |
+| 2 | Accepted | Step 2 is diagnostic and feeds nothing in Steps 3-7. Choose the exemption option, not the restriction: add an explicit note in section 0 that concept_drift_matrix fits on single years, and the leakage tests skip drift.py. | |
+| 3 | Accepted | Rare training columns give huge z-scores on drifted test years. Add a minimum-support filter: keep only columns non-zero in at least 10 training rows, computed on training years only. Document it in step3_preprocessing.md and add a near-constant-column test. | |
+| 4 | Accepted | Cross-year duplicates inflate test scores. Step 1 reports the count of test rows with an exact duplicate in the training years, and Steps 5 and 6 add a sensitivity row on test rows with no such duplicate. No rows are removed from the main results. | |
+| 5 | Accepted | Cheap and correct: the task needs later years for testing. check_no_overlap must also require max(train_years) < min(test_years), with the Step 2 matrix exempt (see 2). | |
+| 6 | Accepted | Silent stale cache is a real risk. Simplest fix: key the cache on file names, sizes and mtimes, store the column names with it, rerun the schema checks on load, and keep it in a git-ignored folder. If this gets complicated, drop the cache. | |
+| 7 | Accepted | Real plan gap. Move train_all_from_split into the Functions list and name the guard Step 7 uses (window_years plus check_no_overlap). | |
+| 8 | Accepted | Report-only: note the row-count imbalance in the Step 7 report and list each window's year composition. Rejecting the optional equal-rows variant because it adds work and is not required. | |
+| 9 | Accepted | One-sentence caveat in the Step 2 report that duplicates and ties inflate KS p-values, so effect size is the main signal. No change to the subsampling. | |
+| 10 | Rejected | The harness fixes these names (tests/test_stepN_*.py, tests/stepN_test_log.md, reviews/stepN_review.md) and the tester owns the test files. .gitignore already exists from the harness. Listing them per step in PLAN.md adds length with no new information. | — |
+| 11 | Accepted | AGENTS.md says to fail loudly on a bad file name. State the rule: list every csv, run parse_filename on each, let it raise, and add a stray-file test. | |
