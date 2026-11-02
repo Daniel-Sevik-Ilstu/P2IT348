@@ -5,6 +5,7 @@ Diagnostic only: nothing here feeds Steps 3-7, so it is exempt from the train-20
 """
 from __future__ import annotations
 
+import warnings
 from itertools import combinations
 from pathlib import Path
 
@@ -15,6 +16,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.stats import ks_2samp
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
@@ -170,6 +172,7 @@ def concept_drift_matrix(samples: dict[int, pd.DataFrame], features: list[str], 
     """
     years = sorted(samples)
     acc = pd.DataFrame(np.nan, index=years, columns=years)
+    not_converged: list[int] = []  # training years whose fit raised a ConvergenceWarning
     for i in years:
         x = np.log1p(samples[i][features].to_numpy(dtype=np.float64))
         y = samples[i][LABEL_COL].to_numpy()
@@ -178,13 +181,18 @@ def concept_drift_matrix(samples: dict[int, pd.DataFrame], features: list[str], 
         keep = (x_tr > 0).sum(axis=0) >= MIN_SUPPORT
         # Scaler and model see year i's training rows only.
         scaler = StandardScaler().fit(x_tr[:, keep])
-        model = LogisticRegression(max_iter=1000, random_state=seed).fit(scaler.transform(x_tr[:, keep]), y_tr)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            model = LogisticRegression(max_iter=1000, random_state=seed).fit(scaler.transform(x_tr[:, keep]), y_tr)
+        if any(issubclass(w.category, ConvergenceWarning) for w in caught):
+            not_converged.append(int(i))
         for j in years:
             if j == i:
                 acc.loc[i, j] = accuracy_score(y_ho, model.predict(scaler.transform(x_ho[:, keep])))
             else:
                 xj = np.log1p(samples[j][features].to_numpy(dtype=np.float64))[:, keep]
                 acc.loc[i, j] = accuracy_score(samples[j][LABEL_COL].to_numpy(), model.predict(scaler.transform(xj)))
+    acc.attrs["not_converged_years"] = not_converged
     return acc
 
 
@@ -226,4 +234,6 @@ def run_drift_analysis(df: pd.DataFrame, results_dir: Path = RESULTS_DIR) -> dic
     _save_heatmap(tables["ks_matrix"], results_dir / "step2_ks_matrix.png", "Mean KS statistic between years", "mean KS")
     _save_heatmap(tables["accuracy_matrix"], results_dir / "step2_accuracy_matrix.png",
                   "Accuracy: train year (row) -> test year (column)", "accuracy")
+    print(f"Step 2: LogisticRegression ConvergenceWarning in training years: "
+          f"{tables['accuracy_matrix'].attrs['not_converged_years'] or 'none'}")
     return tables
