@@ -55,7 +55,7 @@ def ks_feature_table(a: pd.DataFrame, b: pd.DataFrame, features: list[str]) -> p
         if ca.min() == ca.max() and cb.min() == cb.max() and ca[0] == cb[0]:
             skipped[k] = True
             continue
-        res = ks_2samp(ca, cb, method="asymp")  # exact method fails on heavily tied counts
+        res = ks_2samp(ca, cb)  # default method="auto" (exact for small samples, asymptotic otherwise)
         stat[k], pval[k] = res.statistic, res.pvalue
     tested = ~skipped
     if np.isnan(stat[tested]).any() or np.isnan(pval[tested]).any():
