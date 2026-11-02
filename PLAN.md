@@ -20,7 +20,7 @@ Data facts used here come from AGENTS.md. Nothing in this plan has been run yet;
 2. Every fitted object (zero-column mask, `StandardScaler`, classifiers) is fit on the training rows only. Test rows are only passed to `transform` / `predict`. `log1p` is stateless, so it cannot leak.
 3. Tuning never touches 2017-2021.
 4. Step 7: year t is predicted before it is used for training (see Step 7). Expanding/sliding windows refit preprocessing on the window only.
-5. Cross-year duplicates: the 2014-2018 files have many duplicate rows and repeated apknames. Step 1 reports (a) exact duplicate feature rows within a year and (b) apknames or identical feature vectors shared between a training year and a test year. I keep all rows by default (AGENTS.md). If (b) is large, I will propose in the Step 1 report whether to drop test rows that duplicate a training row, and wait for the student's decision. I will not decide this silently.
+5. Cross-year duplicates: the 2014-2018 files have many duplicate rows and repeated apknames. Step 1 reports (a) exact duplicate feature rows within a year and (b) apknames or identical feature vectors shared between a training year and a test year. I keep all rows by default (AGENTS.md); no rows are removed from the main results. Step 1 reports, per test year, the count and share of test rows whose exact feature vector also occurs in the training years (2014-2016). Steps 5 and 6 add a sensitivity row (`subset = "no_train_duplicate"`) with metrics on only the test rows that have no exact duplicate in the training years, and state in the report how many test rows were excluded.
 6. Step 2 (KS tests, accuracy matrix) is descriptive. Its output is never used to select features, hyperparameters or the split.
 
 ### Conventions (from AGENTS.md)
@@ -48,7 +48,8 @@ random_state=42; features as float32/int32; pathlib paths relative to the repo r
 - `combine_years(frames: dict[int, pd.DataFrame]) -> pd.DataFrame`: concatenates years in order (calls `validate_feature_order`); `ignore_index=True`.
 - `load_all(data_dir: Path = DATA_DIR, use_cache: bool = True) -> pd.DataFrame`: the whole dataset (~100,000 x 1,850 incl. label, year).
 - `feature_columns(df: pd.DataFrame) -> list[str]`: all columns except `label` and `year` (1,848 names).
-- `summarize_data(df: pd.DataFrame, data_dir: Path = DATA_DIR) -> pd.DataFrame`: one row per year: files loaded, rows, feature columns, malware count, benign count, exact duplicate rows, all-zero feature columns, apknames repeated within the year, and the number of rows in the year whose feature vector also occurs in an earlier year.
+- `summarize_data(df: pd.DataFrame, data_dir: Path = DATA_DIR) -> pd.DataFrame`: one row per year: files loaded, rows, feature columns, malware count, benign count, exact duplicate rows, all-zero feature columns, apknames repeated within the year, and the number of rows in the year whose feature vector also occurs in an earlier year, and (test years) the number and share of rows whose feature vector occurs in 2014-2016.
+- `train_duplicate_mask(df: pd.DataFrame, train_years=TRAIN_YEARS) -> np.ndarray`: boolean mask over all rows of `df`, True where the row's exact feature vector also occurs in a training-year row (for training-year rows themselves it is not used). Used by Steps 1, 5 and 6.
 - `write_data_summary(summary: pd.DataFrame, path: Path) -> None`: Markdown + CSV.
 
 **Report.** `docs/step1_data_summary.md`: files per year, real row counts (not 1,500), 1,849 raw columns and 1,848 features after dropping `apkname`, malware/benign counts per year, duplicate/overlap audit, dtype and memory use. Table also saved to `results/step1_data_summary.csv`.
@@ -138,6 +139,7 @@ random_state=42; features as float32/int32; pathlib paths relative to the repo r
 - `per_year_table(models: dict, X_test, y_test, years_test) -> pd.DataFrame`: one row per (model, year), same metrics plus `year, n`; only years in `TEST_YEARS` (Step 6).
 - `drift_summary(per_year: pd.DataFrame) -> pd.DataFrame`: per model: first-test-year F1, last-test-year F1, drop, and the F1 slope across years.
 - `assert_test_years_only(years: np.ndarray) -> None`: raises if any year is outside `TEST_YEARS`.
+- `sensitivity_tables(models: dict, X_test, y_test, years_test, dup_mask: np.ndarray) -> tuple[pd.DataFrame, pd.DataFrame]`: the same pooled and per-year tables restricted to test rows where `dup_mask` is False (no exact duplicate in 2014-2016), with a `n_excluded` column; `dup_mask` comes from `train_duplicate_mask` (Step 1). Saved as `results/step5_pooled_no_dup.*` and `results/step6_per_year_no_dup.*`.
 - `save_table(df: pd.DataFrame, stem: str) -> None`: writes `results/<stem>.csv` and `results/<stem>.md` (Markdown table with fixed rounding to 4 decimals).
 - `run_evaluation(df) -> dict[str, pd.DataFrame]`: runs Steps 3-4 pipeline, writes `results/step5_pooled_metrics.*`, `results/step6_per_year_metrics.*`, optional `results/step6_f1_by_year.png`.
 
@@ -145,7 +147,7 @@ random_state=42; features as float32/int32; pathlib paths relative to the repo r
 
 **Reports.** `docs/step5_evaluation.md` (pooled table, accuracy as the primary metric, plus precision/recall/F1 and a short comparison). `docs/step6_test_results.md` (per-year table for each classifier, how performance changes as data drifts, link to Step 2 findings).
 
-**Testing.** Hand-computed confusion matrix (e.g. TP=3, FP=1, FN=2, TN=4) gives the exact accuracy, precision, recall and F1; metrics treat 1 as positive (swapping labels changes precision/recall); all-benign predictions give recall 0 and precision 0 without raising; `per_year_table` has one row per model per test year, the row counts `n` sum to the pooled `n_test`, and weighted per-year accuracy equals the pooled accuracy; `assert_test_years_only` raises on a training year; files are written with the expected columns.
+**Testing.** Hand-computed confusion matrix (e.g. TP=3, FP=1, FN=2, TN=4) gives the exact accuracy, precision, recall and F1; metrics treat 1 as positive (swapping labels changes precision/recall); all-benign predictions give recall 0 and precision 0 without raising; `per_year_table` has one row per model per test year, the row counts `n` sum to the pooled `n_test`, and weighted per-year accuracy equals the pooled accuracy; `assert_test_years_only` raises on a training year; files are written with the expected columns. `train_duplicate_mask` flags a hand-built test row identical to a training row and not a unique one; `sensitivity_tables` excludes exactly the flagged rows and `n + n_excluded` equals the full test count.
 
 ---
 
@@ -191,4 +193,4 @@ One commit per task (about 300 added lines max): config + data, then drift, then
 ## Points where I disagree or want a decision
 1. The accuracy matrix in Step 2 trains on later years and predicts earlier ones; this is a diagnostic only, not used for any design choice, and is exempt from the leakage rules (section 0).
 2. Step 7 (d) freezes the scaler and zero-column mask from 2014-2016; an alternative (updating the scaler with `partial_fit`) is possible but not planned.
-3. Cross-year duplicate handling (item 5 above) is left for the student to decide after the Step 1 audit.
+3. Cross-year duplicates (item 5 above) stay in the main results; the sensitivity row reports the effect.
