@@ -151,7 +151,7 @@ def combine_years(frames: dict[int, pd.DataFrame]) -> pd.DataFrame:
 
 
 def check_schema(df: pd.DataFrame, expected_features: list[str]) -> None:
-    """Raise ValueError unless df has exactly the expected features (in order), label, year, no negatives."""
+    """Raise ValueError unless df has the expected features (in order), no negatives, label in {0,1}, year in 2014-2021, no NaN."""
     if feature_columns(df) != expected_features:
         raise ValueError("Feature columns differ from the CSV header (names or order)")
     if len(expected_features) != N_RAW_COLUMNS - 1:
@@ -160,6 +160,12 @@ def check_schema(df: pd.DataFrame, expected_features: list[str]) -> None:
         raise ValueError("label or year column missing")
     if int(df[expected_features].to_numpy().min(initial=0)) < 0:
         raise ValueError("Negative feature values")
+    if df[[LABEL_COL, YEAR_COL]].isna().any().any():
+        raise ValueError("label or year contains missing values (columns of different length?)")
+    if not df[LABEL_COL].isin([0, 1]).all():
+        raise ValueError("label must be 0 or 1")
+    if not df[YEAR_COL].isin(ALL_YEARS).all():
+        raise ValueError(f"year must be in {ALL_YEARS[0]}-{ALL_YEARS[-1]}")
 
 
 def cache_key(data_dir: Path = DATA_DIR) -> str:
