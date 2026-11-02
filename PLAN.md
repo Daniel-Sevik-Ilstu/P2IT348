@@ -15,7 +15,8 @@ Data facts used here come from AGENTS.md. Nothing in this plan has been run yet;
 
 ### How leakage between years is prevented
 
-1. One function `check_no_overlap(train_years, test_years)` (in `src/preprocess.py`) raises `ValueError` if the sets intersect. Every train/predict call in Steps 3-7 goes through it.
+1. One function `check_no_overlap(train_years, test_years)` (in `src/preprocess.py`) raises `ValueError` if either set is empty, if the sets intersect, or if `max(train_years) >= min(test_years)` (training years must all precede test years). Every train/predict call in Steps 3-7 goes through it.
+   - **Exemption (Step 2).** `concept_drift_matrix` in `src/drift.py` is diagnostic: it fits a scaler and a model on each single year (including 2017-2021) and predicts other years, so it does not obey the train-2014-2016 rule or `check_no_overlap`. Nothing it produces feeds Steps 3-7 (no features, hyperparameters or split choices). The leakage tests skip `drift.py`; they apply to Steps 3-7 only.
 2. Every fitted object (zero-column mask, `StandardScaler`, classifiers) is fit on the training rows only. Test rows are only passed to `transform` / `predict`. `log1p` is stateless, so it cannot leak.
 3. Tuning never touches 2017-2021.
 4. Step 7: year t is predicted before it is used for training (see Step 7). Expanding/sliding windows refit preprocessing on the window only.
@@ -87,7 +88,7 @@ random_state=42; features as float32/int32; pathlib paths relative to the repo r
 **Approach.** `log1p` to tame the heavy tail (counts up to ~92,000), drop features that are all-zero in the training years, then `StandardScaler` fit on training years only. Output float32.
 
 **Functions.**
-- `check_no_overlap(train_years: Iterable[int], test_years: Iterable[int]) -> None`: raises `ValueError` if they share a year (also if either is empty).
+- `check_no_overlap(train_years: Iterable[int], test_years: Iterable[int]) -> None`: raises `ValueError` if they share a year, if either is empty, or if `max(train_years) >= min(test_years)`. Not called by Step 2's `concept_drift_matrix` (exempt, see section 0).
 - `split_by_year(df, train_years, test_years) -> tuple[pd.DataFrame, pd.DataFrame]`: calls `check_no_overlap`, returns the train and test frames (rows selected by `year`).
 - `apply_log1p(X: np.ndarray) -> np.ndarray`: `np.log1p` as float32; raises on negative input.
 - `nonzero_feature_mask(X_train: np.ndarray) -> np.ndarray`: boolean mask of columns with any non-zero value in the training rows only.
@@ -99,7 +100,7 @@ random_state=42; features as float32/int32; pathlib paths relative to the repo r
 
 **Report.** `docs/step3_preprocessing.md`: log1p and why, number of columns dropped, scaler details, the split table above, and the five leakage rules.
 
-**Testing.** Synthetic: scaler mean/std come from training rows only (train mean ~0, std ~1; test is not centred on its own mean); the mask comes from training only (a column non-zero only in a test row is dropped); `log1p` equals `np.log1p`, negative input raises; `check_no_overlap` raises on overlap; `transform` before `fit` raises. Leakage test on the real or synthetic frame: no `year` appears in both the train and test outputs of `prepare_split`, and training years are exactly 2014-2016. Changing test rows must not change the fitted scaler (fit twice, compare `mean_`).
+**Testing.** Synthetic: scaler mean/std come from training rows only (train mean ~0, std ~1; test is not centred on its own mean); the mask comes from training only (a column non-zero only in a test row is dropped); `log1p` equals `np.log1p`, negative input raises; `check_no_overlap` raises on overlap and on train years after test years (e.g. train 2018-2020 / test 2014); `transform` before `fit` raises. Leakage test on the real or synthetic frame: no `year` appears in both the train and test outputs of `prepare_split`, and training years are exactly 2014-2016. Changing test rows must not change the fitted scaler (fit twice, compare `mean_`).
 
 ---
 
@@ -181,13 +182,13 @@ For t=2017 the windows in (b) and (c) are both 2014-2016, so (a)-(c) agree on 20
 
 ## Cross-cutting test plan (tester)
 - `tests/test_stepN_*.py` per step with synthetic data in `tmp_path`; real-data tests marked and skipped when `input_data/` is absent.
-- A project-wide leakage test: every call that fits anything records the years it saw (via a spy/wrapper); none of 2017-2021 may appear before its own prediction.
+- A project-wide leakage test: every call that fits anything records the years it saw (via a spy/wrapper); none of 2017-2021 may appear before its own prediction. Applies to Steps 3-7; `drift.py` (Step 2) is exempt.
 - `python harness.py test N` for one step and `python harness.py test all` for all.
 
 ## Implementation order and commits
 One commit per task (about 300 added lines max): config + data, then drift, then preprocess, then models, then evaluate, then sustainable, then main and docs. Each step is followed by a review and test cycle outside this plan.
 
 ## Points where I disagree or want a decision
-1. The accuracy matrix in Step 2 trains on later years and predicts earlier ones; this is a diagnostic only, not used for any design choice.
+1. The accuracy matrix in Step 2 trains on later years and predicts earlier ones; this is a diagnostic only, not used for any design choice, and is exempt from the leakage rules (section 0).
 2. Step 7 (d) freezes the scaler and zero-column mask from 2014-2016; an alternative (updating the scaler with `partial_fit`) is possible but not planned.
 3. Cross-year duplicate handling (item 5 above) is left for the student to decide after the Step 1 audit.
