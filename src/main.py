@@ -24,7 +24,7 @@ def run_step1() -> pd.DataFrame:
     summary = summarize_data(df)
     write_data_summary(summary, RESULTS_DIR / "step1_data_summary")
     write_data_summary(file_table(df), RESULTS_DIR / "step1_file_table")
-    n_features = df.shape[1] - 2  # minus label and year
+    n_features = len(feature_columns(df))
     print(f"Step 1: {len(df)} rows, {n_features} feature columns, memory {df.memory_usage().sum() / 1e6:.0f} MB")
     print(summary.to_string(index=False))
     # Feature vectors that occur with both labels anywhere in the data (all years pooled).
