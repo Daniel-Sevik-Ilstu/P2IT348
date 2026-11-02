@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 
 import pandas as pd
 
@@ -38,10 +39,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Project 2 pipeline")
     parser.add_argument("--step", type=int, choices=range(1, 8), help="run a single step (1-7)")
     args = parser.parse_args(argv)
-    if args.step in (None, 1):
-        run_step1()
     if args.step not in (None, 1):
-        print(f"Step {args.step} is not implemented yet.")
+        print(f"Step {args.step} is not implemented yet.", file=sys.stderr)
+        return 1  # non-zero so callers can tell nothing ran
+    run_step1()
     return 0
 
 
