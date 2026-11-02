@@ -78,16 +78,26 @@ def ks_all_pairs(samples: dict[int, pd.DataFrame], features: list[str]) -> dict[
     return {(a, b): ks_feature_table(samples[a], samples[b], features) for a, b in combinations(sorted(samples), 2)}
 
 
-def _pair_row(a: int, b: int, table: pd.DataFrame) -> dict:
-    """Summary of one pair's feature table: tested/skipped counts, mean KS, % Bonferroni-significant."""
+def common_feature_mask(pairs: dict[tuple[int, int], pd.DataFrame]) -> np.ndarray:
+    """Features tested in at least one pair (non-constant in at least one year sample); the fixed set for mean KS."""
+    return np.any([~t["skipped"].to_numpy() for t in pairs.values()], axis=0)
+
+
+def _pair_row(a: int, b: int, table: pd.DataFrame, common: np.ndarray) -> dict:
+    """Summary of one pair's feature table: tested/skipped counts, mean KS, % Bonferroni-significant.
+
+    mean_ks is taken over the fixed `common` feature set for every pair, with skipped features
+    counted as KS = 0 (constant and equal in both samples), so pairs are comparable.
+    """
     tested = ~table["skipped"].to_numpy()
     sig = bonferroni_significant(table["p_value"].to_numpy())
+    ks = table["ks_stat"].fillna(0.0).to_numpy()
     return {
         "year_a": a,
         "year_b": b,
         "n_tested": int(tested.sum()),
         "n_skipped": int((~tested).sum()),
-        "mean_ks": float(table.loc[tested, "ks_stat"].mean()),
+        "mean_ks": float(ks[common].mean()),
         "share_significant": float(sig.sum() / max(tested.sum(), 1)),
     }
 
@@ -102,7 +112,8 @@ def ks_year_pairs(pairs: dict[tuple[int, int], pd.DataFrame], mode: str) -> pd.D
         keys = list(pairs)
     else:
         raise ValueError(f"unknown mode {mode!r}")
-    return pd.DataFrame([_pair_row(a, b, pairs[(a, b)]) for a, b in sorted(keys)])
+    common = common_feature_mask(pairs)  # same feature basis for every pair and every mode
+    return pd.DataFrame([_pair_row(a, b, pairs[(a, b)], common) for a, b in sorted(keys)])
 
 
 def ks_matrix(pair_table: pd.DataFrame, years: list[int], value: str = "mean_ks") -> pd.DataFrame:
@@ -130,7 +141,9 @@ def top_drifting_features(
     out = pd.DataFrame({"feature": features})
     for y in later:
         out[f"ks_{y}"] = pairs[(base, y)]["ks_stat"].to_numpy()
-    out["mean_ks"] = out[[f"ks_{y}" for y in later]].mean(axis=1)  # NaN rows (skipped everywhere) sort last
+    # Skipped features (constant and equal in both samples) have KS = 0; fill before averaging
+    # so every feature is averaged over the same seven comparisons.
+    out["mean_ks"] = out[[f"ks_{y}" for y in later]].fillna(0.0).mean(axis=1)
     for y in sorted(samples):
         out[f"mean_{y}"] = samples[y][features].to_numpy().mean(axis=0)
     return out.sort_values("mean_ks", ascending=False).head(k).reset_index(drop=True)
