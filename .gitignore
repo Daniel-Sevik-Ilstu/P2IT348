@@ -12,3 +12,6 @@ __pycache__/
 .venv/
 venv/
 .ipynb_checkpoints/
+
+# Step 1 data cache
+cache/
