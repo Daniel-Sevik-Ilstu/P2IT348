@@ -6,11 +6,11 @@ Written by the builder agent. All numbers come from `python -m src.main --step 2
 
 **Data and sampling.** The full dataset has 99,000 rows (2014-2018: 18,000 per year; 2019-2021: 3,000 per year). To make KS p-values comparable across year pairs, every year is subsampled to the same size, **3,000 rows (the smallest year), with `random_state=42`, class-balanced (1,500 malware + 1,500 goodware)**. Malware and goodware are pooled within a year; balanced sampling removes any change in class mix as a source of drift. Features are the 1,848 API-call counts (raw counts, not log-transformed).
 
-**Feature drift (KS).** For each of the 28 year pairs and each feature we ran `scipy.stats.ks_2samp` (`method="asymp"`, because the exact method fails to converge on heavily tied count data). A feature that is constant with the same value in both samples (in practice all-zero in both) is **skipped, not tested, and counted** (`n_skipped`); no tested feature produced NaN (checked in code). Per pair: `mean_ks` = mean KS statistic over tested features (effect size; 0 = identical distributions, 1 = disjoint); `pct_significant` = percent of tested features with `p < 0.05 / m`, where `m` is the number of tested features in that pair (Bonferroni). `n_tested` differs between pairs (787-923 features skipped), so the feature set behind `mean_ks` differs slightly from pair to pair.
+**Feature drift (KS).** For each of the 28 year pairs and each feature we ran `scipy.stats.ks_2samp` (default `method="auto"`: scipy tries the exact calculation and falls back to the asymptotic one when it is unsuccessful on heavily tied counts; the fallback is silenced in code because it is expected). A feature that is constant with the same value in both samples (in practice all-zero in both) is **skipped, not tested, and counted** (`n_skipped`); no tested feature produced NaN (checked in code). Per pair: `mean_ks` = mean KS statistic over one **fixed set of 1,138 features for every pair** (features that are non-constant in at least one of the eight year samples), with skipped features counted as KS = 0 (effect size; 0 = identical distributions, 1 = disjoint); `pct_significant` = percent of tested features with `p < 0.05 / m`, where `m` is the number of tested features in that pair (Bonferroni). `n_tested` still differs between pairs (787-923 features skipped), but that now affects only the significance share, not `mean_ks`, which uses the same features in every pair. The per-feature `mean_ks` in the top-20 table fills skipped years with 0 before averaging over the seven "vs 2014" comparisons.
 
 **Caveats.** KS assumes continuous data; these are tied counts, which makes p-values conservative. Duplicate rows (many in 2014-2018, see Step 1) mean the samples are not independent, which inflates significance. So the KS statistic is the main signal and `pct_significant` is secondary.
 
-**Concept drift.** Accuracy matrix: for each year i, `log1p` -> `StandardScaler` (fit on year i's training rows only) -> `LogisticRegression(max_iter=1000, random_state=42)` is trained on year i's 3,000-row sample, then scored on year j. The diagonal uses a stratified 70/30 split of year i (accuracy on the held-out 30%); off-diagonal cells use the whole year-j sample. This is a diagnostic: it trains on 2017-2021 too and is exempt from the train-2014-2016 rule (PLAN.md section 0). Nothing from it feeds Steps 3-7. It is one run on one sample per year, so small differences (a point or two) should not be over-read; the noise level was not measured.
+**Concept drift.** Accuracy matrix: for each year i, `log1p` -> minimum-support filter (keep columns non-zero in at least `MIN_SUPPORT = 10` of year i's training rows, same rule as Step 3) -> `StandardScaler` (both fit on year i's training rows only) -> `LogisticRegression(max_iter=1000, random_state=42)` is trained on year i's 3,000-row sample, then scored on year j. The diagonal uses a stratified 70/30 split of year i (accuracy on the held-out 30%); off-diagonal cells use the whole year-j sample. Because train and test years differ in both feature distribution and labelling rule, the matrix measures **combined drift** (covariate shift plus concept drift), not concept drift alone. Convergence: no fit raised a `ConvergenceWarning` (`max_iter=1000` was enough for all eight models). This is a diagnostic: it trains on 2017-2021 too and is exempt from the train-2014-2016 rule (PLAN.md section 0). Nothing from it feeds Steps 3-7. It is one run on one sample per year, so small differences (a point or two) should not be over-read; the noise level was not measured.
 
 ## Results: mean KS per year pair
 
@@ -18,48 +18,48 @@ Each year vs 2014:
 
 | year_a | year_b | n_tested | n_skipped | mean_ks | pct_significant |
 |---|---|---|---|---|---|
-| 2014 | 2015 | 925 | 923 | 0.0278 | 16.4000 |
-| 2014 | 2016 | 976 | 872 | 0.0423 | 21.8000 |
-| 2014 | 2017 | 959 | 889 | 0.0518 | 25.9000 |
-| 2014 | 2018 | 1034 | 814 | 0.0475 | 25.1000 |
-| 2014 | 2019 | 1045 | 803 | 0.0561 | 27.3000 |
-| 2014 | 2020 | 1006 | 842 | 0.0692 | 34.7000 |
-| 2014 | 2021 | 1061 | 787 | 0.0910 | 36.9000 |
+| 2014 | 2015 | 925 | 923 | 0.0226 | 16.4 |
+| 2014 | 2016 | 976 | 872 | 0.0363 | 21.8 |
+| 2014 | 2017 | 959 | 889 | 0.0437 | 25.9 |
+| 2014 | 2018 | 1034 | 814 | 0.0432 | 25.1 |
+| 2014 | 2019 | 1045 | 803 | 0.0515 | 27.3 |
+| 2014 | 2020 | 1006 | 842 | 0.0612 | 34.7 |
+| 2014 | 2021 | 1061 | 787 | 0.0849 | 36.9 |
 
 Each year vs the previous year:
 
 | year_a | year_b | n_tested | n_skipped | mean_ks | pct_significant |
 |---|---|---|---|---|---|
-| 2014 | 2015 | 925 | 923 | 0.0278 | 16.4000 |
-| 2015 | 2016 | 952 | 896 | 0.0288 | 16.9000 |
-| 2016 | 2017 | 959 | 889 | 0.0327 | 21.8000 |
-| 2017 | 2018 | 1002 | 846 | 0.0274 | 15.6000 |
-| 2018 | 2019 | 1034 | 814 | 0.0304 | 16.1000 |
-| 2019 | 2020 | 1037 | 811 | 0.0253 | 17.1000 |
-| 2020 | 2021 | 1036 | 812 | 0.0535 | 26.5000 |
+| 2014 | 2015 | 925 | 923 | 0.0226 | 16.4 |
+| 2015 | 2016 | 952 | 896 | 0.0241 | 16.9 |
+| 2016 | 2017 | 959 | 889 | 0.0276 | 21.8 |
+| 2017 | 2018 | 1002 | 846 | 0.0241 | 15.4 |
+| 2018 | 2019 | 1034 | 814 | 0.0277 | 16.1 |
+| 2019 | 2020 | 1037 | 811 | 0.0231 | 17.1 |
+| 2020 | 2021 | 1036 | 812 | 0.0487 | 26.5 |
 
 Full year x year matrix of mean KS (`results/step2_ks_matrix.csv`, heatmap `results/step2_ks_matrix.png`):
 
 | year | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 |
 |---|---|---|---|---|---|---|---|---|
-| 2014 | 0 | 0.0278 | 0.0423 | 0.0518 | 0.0475 | 0.0561 | 0.0692 | 0.0910 |
-| 2015 | 0.0278 | 0 | 0.0288 | 0.0408 | 0.0355 | 0.0459 | 0.0609 | 0.0894 |
-| 2016 | 0.0423 | 0.0288 | 0 | 0.0327 | 0.0309 | 0.0461 | 0.0584 | 0.0773 |
-| 2017 | 0.0518 | 0.0408 | 0.0327 | 0 | 0.0274 | 0.0508 | 0.0620 | 0.0865 |
-| 2018 | 0.0475 | 0.0355 | 0.0309 | 0.0274 | 0 | 0.0304 | 0.0438 | 0.0788 |
-| 2019 | 0.0561 | 0.0459 | 0.0461 | 0.0508 | 0.0304 | 0 | 0.0253 | 0.0688 |
-| 2020 | 0.0692 | 0.0609 | 0.0584 | 0.0620 | 0.0438 | 0.0253 | 0 | 0.0535 |
-| 2021 | 0.0910 | 0.0894 | 0.0773 | 0.0865 | 0.0788 | 0.0688 | 0.0535 | 0 |
+| 2014 | 0.0000 | 0.0226 | 0.0363 | 0.0437 | 0.0432 | 0.0515 | 0.0612 | 0.0849 |
+| 2015 | 0.0226 | 0.0000 | 0.0241 | 0.0335 | 0.0315 | 0.0414 | 0.0527 | 0.0819 |
+| 2016 | 0.0363 | 0.0241 | 0.0000 | 0.0276 | 0.0278 | 0.0421 | 0.0513 | 0.0717 |
+| 2017 | 0.0437 | 0.0335 | 0.0276 | 0.0000 | 0.0241 | 0.0459 | 0.0533 | 0.0786 |
+| 2018 | 0.0432 | 0.0315 | 0.0278 | 0.0241 | 0.0000 | 0.0277 | 0.0396 | 0.0725 |
+| 2019 | 0.0515 | 0.0414 | 0.0421 | 0.0459 | 0.0277 | 0.0000 | 0.0231 | 0.0640 |
+| 2020 | 0.0612 | 0.0527 | 0.0513 | 0.0533 | 0.0396 | 0.0231 | 0.0000 | 0.0487 |
+| 2021 | 0.0849 | 0.0819 | 0.0717 | 0.0786 | 0.0725 | 0.0640 | 0.0487 | 0.0000 |
 
 Pairs ranked by mean KS (top 5 of 28; all in `results/step2_ks_all_pairs.csv`):
 
 | year_a | year_b | n_tested | n_skipped | mean_ks | pct_significant |
 |---|---|---|---|---|---|
-| 2014 | 2021 | 1061 | 787 | 0.0910 | 36.9000 |
-| 2015 | 2021 | 1043 | 805 | 0.0894 | 36.7000 |
-| 2017 | 2021 | 1034 | 814 | 0.0865 | 35.8000 |
-| 2018 | 2021 | 1047 | 801 | 0.0788 | 34.2000 |
-| 2016 | 2021 | 1056 | 792 | 0.0773 | 37.5000 |
+| 2014 | 2021 | 1061 | 787 | 0.0849 | 36.9 |
+| 2015 | 2021 | 1043 | 805 | 0.0819 | 36.7 |
+| 2017 | 2021 | 1034 | 814 | 0.0786 | 35.8 |
+| 2018 | 2021 | 1047 | 801 | 0.0725 | 34.2 |
+| 2016 | 2021 | 1056 | 792 | 0.0717 | 37.5 |
 
 ## Features that drift most
 
@@ -90,37 +90,38 @@ Top 20 features by mean KS over the seven "vs 2014" comparisons (`ks_YYYY` = KS 
 
 ## Years that differ most
 
-- The pair that differs most is **2014 vs 2021** (mean KS 0.0910). 2021 is the most different year from every other year except 2020, whose largest distance is to 2014 (0.069, against 0.053 to 2021).
-- Mean KS against 2014 rises with the gap: 2015: 0.028, 2016: 0.042, 2017: 0.052, 2018: 0.048, 2019: 0.056, 2020: 0.069, 2021: 0.091. The exception is 2018 (0.048), slightly below 2017 (0.052).
-- Consecutive-year KS is small (0.025-0.033) until 2020 -> 2021, which jumps to 0.0535, the largest year-to-year step.
+- The pair that differs most is **2014 vs 2021** (mean KS 0.0849). 2021 is the most different year from every other year except 2020, whose largest distance is to 2014 (0.061, against 0.049 to 2021).
+- Mean KS against 2014 rises with the gap: 2015: 0.023, 2016: 0.036, 2017: 0.044, 2018: 0.043, 2019: 0.052, 2020: 0.061, 2021: 0.085. The exception is 2018 (0.0432), marginally below 2017 (0.0437).
+- Consecutive-year KS is small (0.023-0.028) until 2020 -> 2021, which jumps to 0.0487, the largest year-to-year step.
 - Many top drifting features rise sharply in call counts after 2014; for example `Landroid/os/Process;.myPid:()I` goes from a mean of about 1 call in 2014 to about 11 in 2018 and 2021. Possible causes (larger apps, changing Android API use) were not tested.
 
 ## Concept drift: accuracy matrix (train year = row, test year = column)
 
 | train \ test | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 |
 |---|---|---|---|---|---|---|---|---|
-| 2014 | 0.9633 | 0.9230 | 0.9167 | 0.8347 | 0.8947 | 0.5717 | 0.5623 | 0.6153 |
-| 2015 | 0.9310 | 0.9656 | 0.9517 | 0.8653 | 0.8957 | 0.6587 | 0.6413 | 0.6570 |
-| 2016 | 0.9153 | 0.9423 | 0.9756 | 0.9660 | 0.9350 | 0.5787 | 0.5473 | 0.3623 |
-| 2017 | 0.8577 | 0.8157 | 0.8990 | 0.9778 | 0.9403 | 0.6723 | 0.6740 | 0.6930 |
-| 2018 | 0.8347 | 0.8450 | 0.8730 | 0.9633 | 0.9622 | 0.6110 | 0.5920 | 0.6227 |
-| 2019 | 0.5673 | 0.6307 | 0.7343 | 0.7570 | 0.8393 | 0.9589 | 0.9387 | 0.7343 |
-| 2020 | 0.5883 | 0.6257 | 0.6787 | 0.7643 | 0.7703 | 0.8823 | 0.9511 | 0.9357 |
-| 2021 | 0.6103 | 0.6293 | 0.6747 | 0.6397 | 0.7140 | 0.8270 | 0.8877 | 0.9556 |
+| 2014 | 0.9744 | 0.9280 | 0.9130 | 0.8177 | 0.8873 | 0.6377 | 0.6303 | 0.5190 |
+| 2015 | 0.9350 | 0.9678 | 0.9603 | 0.8757 | 0.9017 | 0.5783 | 0.5603 | 0.5737 |
+| 2016 | 0.9193 | 0.9433 | 0.9767 | 0.9667 | 0.9353 | 0.5743 | 0.5410 | 0.3507 |
+| 2017 | 0.8530 | 0.8127 | 0.9000 | 0.9744 | 0.9413 | 0.6513 | 0.6407 | 0.6700 |
+| 2018 | 0.8510 | 0.8413 | 0.8777 | 0.9653 | 0.9656 | 0.6000 | 0.5793 | 0.6400 |
+| 2019 | 0.5727 | 0.6220 | 0.7333 | 0.7687 | 0.8540 | 0.9611 | 0.9370 | 0.7280 |
+| 2020 | 0.6340 | 0.6330 | 0.6807 | 0.7640 | 0.7800 | 0.8870 | 0.9522 | 0.9333 |
+| 2021 | 0.6047 | 0.6297 | 0.6810 | 0.6467 | 0.7107 | 0.8233 | 0.8810 | 0.9589 |
 
 (`results/step2_accuracy_matrix.csv`, heatmap `results/step2_accuracy_matrix.png`.)
 
 Reading it:
-- The diagonal (held-out same-year data) is 0.95-0.98.
-- Models trained on 2014-2018 score 0.55-0.69 on 2019-2021, except the 2016 model on 2021, which scores 0.36. That is below the 0.50 chance level for balanced data, so its decision boundary is systematically wrong on 2021.
-- Models trained on 2019-2021 score 0.57-0.76 on 2014-2017.
-- The break between 2018 and 2019 is the sharpest: the 2018 model drops from 0.96 on 2018 to 0.61 on 2019.
-- Models trained on one of the years 2019-2021 do better on the next year (0.94 for 2019 -> 2020, 0.94 for 2020 -> 2021).
+- The diagonal (held-out same-year data) is 0.95-0.98 (optimistic, see "Duplicates and the diagonal" below).
+- Models trained on 2014-2018 score 0.52-0.67 on 2019-2021, except the 2016 model on 2021, which scores 0.35. That is far below the 0.50 chance level for balanced data.
+- Models trained on 2019-2021 score 0.57-0.77 on 2014-2017.
+- The break between 2018 and 2019 is the sharpest: the 2018 model drops from 0.97 on 2018 to 0.60 on 2019.
+- Models trained on one of the years 2019-2021 do better on the next year (0.94 for 2019 -> 2020, 0.93 for 2020 -> 2021).
+- **The low cell survives the min-support filter.** Before the filter (first version of this report) the 2016 -> 2021 cell was 0.362 and the 2021 sample had max |z| = 214 under the 2016 scaler. After the filter (686 columns kept for 2016) it is 0.351, with max |z| = 41 and 50 columns above 20. So extrapolation from rare columns is not the main cause. In an ad hoc check (not in `src/`) the 2016 model labels 75% of the 2021 rows malware: it catches 60% of 2021 malware but only 10% of 2021 goodware are classified correctly. Counts of many API calls in 2021 apps are much larger than in 2016 (e.g. `StringBuilder.append(String)` mean 5,657 vs 3,409), so 2021 goodware looks like 2016 malware to a model that learned "heavy API use = malware". This is covariate shift plus a learned boundary that does not transfer; I did not test it further.
 
 ## What this means for the models
 
-- A model trained on 2014-2016 faces test years that are increasingly far from it in feature space (mean KS against 2014 of 0.05 for 2017 up to 0.09 for 2021). Expect performance to decrease for later test years, with the largest losses on 2019-2021.
-- The accuracy matrix suggests this is not only feature drift but also concept drift: the 2014-2016 models reach 0.83-0.97 on 2017-2018 but only 0.36-0.66 on 2019-2021. The matrix is a prediction only; Step 6 tests it with the real pipeline (all of 2014-2016 pooled, all rows).
+- A model trained on 2014-2016 faces test years that are increasingly far from it in feature space (mean KS against 2014 of 0.04 for 2017 up to 0.08 for 2021). Expect performance to decrease for later test years, with the largest losses on 2019-2021.
+- The accuracy matrix suggests this is combined drift (feature shift plus a changed decision boundary; the matrix cannot separate the two): the 2014-2016 models reach 0.82-0.97 on 2017-2018 but only 0.35-0.64 on 2019-2021. The matrix is a prediction only; Step 6 tests it with the real pipeline (all of 2014-2016 pooled, all rows).
 - The mean KS matrix changes smoothly while accuracy collapses at 2019, so a modest average feature shift can still move the decision boundary a lot. We did not separate genuine change in app behaviour from dataset effects (2019-2021 have 6x fewer rows per year than 2014-2018).
-- For Step 7: retraining on recent years looks promising, since adjacent-year pairs from 2019 on score about 0.94 while old models score 0.36-0.66 on those years. This is a hint to be verified in Step 7, not a result.
-- Limitations: one 3,000-row sample per year (seed 42), no repeats; duplicates remain in the samples; the set of skipped all-zero features differs per pair.
+- For Step 7: retraining on recent years looks promising, since adjacent-year pairs from 2019 on score about 0.94 while old models score 0.35-0.67 on those years. This is a hint to be verified in Step 7, not a result.
+- Limitations: one 3,000-row sample per year (seed 42), no repeats; duplicates remain in the samples; the set of skipped all-zero features differs per pair (affects `n_tested` and the significance share only).
