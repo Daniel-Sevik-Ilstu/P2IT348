@@ -7,6 +7,7 @@ import sys
 import pandas as pd
 
 from src.config import RESULTS_DIR
+from src.drift import run_drift_analysis
 from src.data import (
     _row_hashes,
     feature_columns,
@@ -34,15 +35,26 @@ def run_step1() -> pd.DataFrame:
     return df
 
 
+def run_step2(df: pd.DataFrame | None = None) -> dict[str, pd.DataFrame]:
+    """Step 2: KS feature drift and the concept-drift accuracy matrix; writes results/step2_*."""
+    tables = run_drift_analysis(load_all() if df is None else df)
+    for name in ("ks_vs_2014", "ks_consecutive", "accuracy_matrix"):
+        print(f"Step 2 {name}:")
+        print(tables[name].round(4).to_string())
+    return tables
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Run the pipeline (only Step 1 exists so far); --step N runs one step."""
+    """Run the pipeline (Steps 1-2 exist so far); --step N runs one step."""
     parser = argparse.ArgumentParser(description="Project 2 pipeline")
     parser.add_argument("--step", type=int, choices=range(1, 8), help="run a single step (1-7)")
     args = parser.parse_args(argv)
-    if args.step not in (None, 1):
+    if args.step not in (None, 1, 2):
         print(f"Step {args.step} is not implemented yet.", file=sys.stderr)
         return 1  # non-zero so callers can tell nothing ran
-    run_step1()
+    df = run_step1() if args.step in (None, 1, 2) else None
+    if args.step in (None, 2):
+        run_step2(df)
     return 0
 
 

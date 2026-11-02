@@ -6,12 +6,22 @@ Diagnostic only: nothing here feeds Steps 3-7, so it is exempt from the train-20
 from __future__ import annotations
 
 from itertools import combinations
+from pathlib import Path
 
+import matplotlib
+
+matplotlib.use("Agg")  # no display needed
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.stats import ks_2samp
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
-from src.config import ALL_YEARS, LABEL_COL, SEED, YEAR_COL
+from src.config import ALL_YEARS, LABEL_COL, RESULTS_DIR, SEED, YEAR_COL
+from src.data import feature_columns
 
 
 def subsample_years(df: pd.DataFrame, n: int | None = None, seed: int = SEED) -> dict[int, pd.DataFrame]:
@@ -45,7 +55,7 @@ def ks_feature_table(a: pd.DataFrame, b: pd.DataFrame, features: list[str]) -> p
         if ca.min() == ca.max() and cb.min() == cb.max() and ca[0] == cb[0]:
             skipped[k] = True
             continue
-        res = ks_2samp(ca, cb)
+        res = ks_2samp(ca, cb, method="asymp")  # exact method fails on heavily tied counts
         stat[k], pval[k] = res.statistic, res.pvalue
     tested = ~skipped
     if np.isnan(stat[tested]).any() or np.isnan(pval[tested]).any():
@@ -124,3 +134,69 @@ def top_drifting_features(
     for y in sorted(samples):
         out[f"mean_{y}"] = samples[y][features].to_numpy().mean(axis=0)
     return out.sort_values("mean_ks", ascending=False).head(k).reset_index(drop=True)
+
+
+def concept_drift_matrix(samples: dict[int, pd.DataFrame], features: list[str], seed: int = SEED) -> pd.DataFrame:
+    """Accuracy matrix: rows = training year i, columns = test year j.
+
+    Per year i: log1p + StandardScaler + LogisticRegression, all fit on year i's training part only.
+    The diagonal uses a stratified 70/30 split of year i (accuracy on the held-out 30%); off-diagonal
+    cells use the whole sample of year j.
+    """
+    years = sorted(samples)
+    acc = pd.DataFrame(np.nan, index=years, columns=years)
+    for i in years:
+        x = np.log1p(samples[i][features].to_numpy(dtype=np.float64))
+        y = samples[i][LABEL_COL].to_numpy()
+        x_tr, x_ho, y_tr, y_ho = train_test_split(x, y, test_size=0.3, stratify=y, random_state=seed)
+        # Scaler and model see year i's training rows only.
+        scaler = StandardScaler().fit(x_tr)
+        model = LogisticRegression(max_iter=1000, random_state=seed).fit(scaler.transform(x_tr), y_tr)
+        for j in years:
+            if j == i:
+                acc.loc[i, j] = accuracy_score(y_ho, model.predict(scaler.transform(x_ho)))
+            else:
+                xj = np.log1p(samples[j][features].to_numpy(dtype=np.float64))
+                acc.loc[i, j] = accuracy_score(samples[j][LABEL_COL].to_numpy(), model.predict(scaler.transform(xj)))
+    return acc
+
+
+def _save_heatmap(matrix: pd.DataFrame, path: Path, title: str, cbar_label: str) -> None:
+    """Save a year x year matrix as an annotated heatmap PNG."""
+    fig, ax = plt.subplots(figsize=(7, 6))
+    im = ax.imshow(matrix.to_numpy(dtype=float), cmap="viridis")
+    ax.set_xticks(range(len(matrix.columns)), [str(c) for c in matrix.columns])
+    ax.set_yticks(range(len(matrix.index)), [str(i) for i in matrix.index])
+    for r in range(matrix.shape[0]):
+        for c in range(matrix.shape[1]):
+            ax.text(c, r, f"{matrix.iat[r, c]:.2f}", ha="center", va="center", color="white", fontsize=8)
+    ax.set_title(title)
+    fig.colorbar(im, ax=ax, label=cbar_label)
+    fig.tight_layout()
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
+
+
+def run_drift_analysis(df: pd.DataFrame, results_dir: Path = RESULTS_DIR) -> dict[str, pd.DataFrame]:
+    """Run all Step 2 analyses, write results/step2_*.csv|png, and return the tables."""
+    results_dir.mkdir(parents=True, exist_ok=True)
+    features = feature_columns(df)
+    samples = subsample_years(df)
+    years = sorted(samples)
+    pairs = ks_all_pairs(samples, features)
+    all_pairs = ks_year_pairs(pairs, "all")
+    tables = {
+        "ks_vs_2014": ks_year_pairs(pairs, "vs_2014"),
+        "ks_consecutive": ks_year_pairs(pairs, "consecutive"),
+        "ks_all_pairs": most_different_years(all_pairs),
+        "ks_matrix": ks_matrix(all_pairs, years),
+        "top20_features": top_drifting_features(pairs, samples, features, 20),
+        "accuracy_matrix": concept_drift_matrix(samples, features),
+    }
+    for name, t in tables.items():
+        # The two matrices are indexed by year; keep the index as a column.
+        t.to_csv(results_dir / f"step2_{name}.csv", index=name.endswith("matrix"), index_label="year")
+    _save_heatmap(tables["ks_matrix"], results_dir / "step2_ks_matrix.png", "Mean KS statistic between years", "mean KS")
+    _save_heatmap(tables["accuracy_matrix"], results_dir / "step2_accuracy_matrix.png",
+                  "Accuracy: train year (row) -> test year (column)", "accuracy")
+    return tables
