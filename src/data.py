@@ -98,6 +98,8 @@ def load_file(path: Path) -> pd.DataFrame:
         df = pd.read_csv(path, usecols=range(1, N_RAW_COLUMNS), dtype=np.int32)
     except (ValueError, OverflowError) as exc:
         raise ValueError(f"{path.name}: non-integer, missing or out-of-range values ({exc})") from exc
+    if len(df) == 0:
+        raise ValueError(f"{path.name}: file has no data rows")
     if list(df.columns) != features:
         raise ValueError(f"{path.name}: columns changed while reading")
     if int(df.to_numpy().min(initial=0)) < 0:
