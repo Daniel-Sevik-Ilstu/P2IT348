@@ -40,7 +40,7 @@ random_state=42; features as float32/int32; pathlib paths relative to the repo r
 
 **Functions.**
 - `parse_filename(name: str) -> tuple[int, int]`: regex `^sampled_(\d{4})_(malware|benign)_api\.csv$` on the base name; returns `(year, label)`. Raises `ValueError` on any other name, a year outside 2014-2021, or a bad class.
-- `list_data_files(data_dir: Path = DATA_DIR) -> list[Path]`: sorted list; raises if not exactly one malware and one benign file for each of 2014-2021 (16 files).
+- `list_data_files(data_dir: Path = DATA_DIR) -> list[Path]`: lists every `*.csv` in `data_dir` and runs `parse_filename` on each, so a stray or misnamed CSV raises `ValueError` (not ignored). Returns the sorted list; also raises if there is not exactly one malware and one benign file for each of 2014-2021 (16 files).
 - `load_file(path: Path) -> pd.DataFrame`: reads the CSV, checks the shape is `(n, 1849)` and the first column is `apkname`, drops it, casts the 1,848 features to int32, appends `label` (int8) and `year` (int16) from `parse_filename`. Raises `ValueError` if the column count is not 1,849 or any value is negative or missing. Does not assert a row count.
 - `read_apknames(path: Path) -> pd.Series`: the `apkname` column only (for the duplicate/overlap audit; never used as a feature).
 - `load_year(year: int, data_dir: Path = DATA_DIR) -> pd.DataFrame`: concatenates that year's malware and benign files.
@@ -55,7 +55,7 @@ random_state=42; features as float32/int32; pathlib paths relative to the repo r
 
 **Report.** `docs/step1_data_summary.md`: files per year, real row counts (not 1,500), 1,849 raw columns and 1,848 features after dropping `apkname`, malware/benign counts per year, duplicate/overlap audit, dtype and memory use. Table also saved to `results/step1_data_summary.csv`.
 
-**Testing.** Synthetic CSVs in `tmp_path`: `parse_filename` accepts valid names and rejects bad ones (wrong year, wrong class, extra suffix, path with directories); `load_file` drops the first column, gives 1,848 features, correct label from name, wrong column count raises; mismatched feature order raises; `combine_years` row count equals the sum of inputs; label and year columns are right. Cache: `cache_key` changes when a file's size or mtime changes or the schema version changes; a second `load_all` returns an equal frame; touching a CSV forces a rebuild; a cache with altered column names or order is rejected. Integration test (skipped if `input_data/` is absent): 16 files, 1,849 raw columns each, 18,000 rows per year for 2014-2018 and 3,000 for 2019-2021, equal malware and benign counts, no NaN.
+**Testing.** Synthetic CSVs in `tmp_path`: `parse_filename` accepts valid names and rejects bad ones (wrong year, wrong class, extra suffix, path with directories); `load_file` drops the first column, gives 1,848 features, correct label from name, wrong column count raises; mismatched feature order raises; `combine_years` row count equals the sum of inputs; label and year columns are right. `list_data_files` raises on a stray CSV (e.g. `notes.csv`) in the folder and on a missing or duplicated year/class file. Cache: `cache_key` changes when a file's size or mtime changes or the schema version changes; a second `load_all` returns an equal frame; touching a CSV forces a rebuild; a cache with altered column names or order is rejected. Integration test (skipped if `input_data/` is absent): 16 files, 1,849 raw columns each, 18,000 rows per year for 2014-2018 and 3,000 for 2019-2021, equal malware and benign counts, no NaN.
 
 ---
 
@@ -114,6 +114,7 @@ random_state=42; features as float32/int32; pathlib paths relative to the repo r
 - `build_model(name: str) -> sklearn estimator`: `name` in `{"logreg", "random_forest", "sgd"}`; raises `ValueError` otherwise.
 - `train_model(name: str, X_train: np.ndarray, y_train: np.ndarray) -> estimator`: builds and fits.
 - `train_all(X_train, y_train) -> dict[str, estimator]`.
+- `train_all_from_split(split: dict) -> dict[str, estimator]`: the static Step 4 entry point; wraps `train_all` and raises if `set(split["years_train"]) <= set(TRAIN_YEARS)` is false. This guard is for the static 2014-2016 model only; Step 7 windows (2017+) do not use it. Step 7 uses `window_years` plus `check_no_overlap` instead (see Step 7).
 - `tune_logreg(tune_split: dict) -> dict`: only if time allows: small grid on `C` using train 2014-2015 / validate 2016, scoring F1 (malware); returns best params and the grid scores.
 - `MODEL_NAMES: tuple[str, ...]`.
 
@@ -124,8 +125,7 @@ random_state=42; features as float32/int32; pathlib paths relative to the repo r
 
 **Report.** `docs/step4_models.md`: the three models, why each, the hyperparameter table and justification, training time per model, any convergence warnings, and tuning results if run.
 
-**Testing.** Synthetic separable data: each model trains and predicts both classes with accuracy above chance (e.g. > 0.9); `build_model` returns the right class with `random_state == 42` (and `class_weight == "balanced"` for logreg only, `n_estimators == 200` where applicable); unknown name raises; the model returned by `build_model("sgd")` can be fit and then called with `partial_fit(X, y)` without error (not just "has the method"); same seed gives identical predictions twice; training with rows from a test year raises (guard checked via `years_train` argument in `train_all_from_split`, see below). A test that the training matrix has only years 2014-2016.
-- `train_all_from_split(split: dict) -> dict[str, estimator]`: wraps `train_all` and asserts `set(split["years_train"]) <= set(TRAIN_YEARS)`.
+**Testing.** Synthetic separable data: each model trains and predicts both classes with accuracy above chance (e.g. > 0.9); `build_model` returns the right class with `random_state == 42` (and `class_weight == "balanced"` for logreg only, `n_estimators == 200` where applicable); unknown name raises; the model returned by `build_model("sgd")` can be fit and then called with `partial_fit(X, y)` without error (not just "has the method"); same seed gives identical predictions twice; training with rows from a test year raises (guard checked via `years_train` argument in `train_all_from_split`, see below). A test that the training matrix has only years 2014-2016, and that `train_all_from_split` raises on a split containing a test year.
 
 ---
 
@@ -166,6 +166,7 @@ random_state=42; features as float32/int32; pathlib paths relative to the repo r
 For t=2017 the windows in (b) and (c) are both 2014-2016, so (a)-(c) agree on 2017; they differ from 2018 on.
 
 **Functions.**
+- Step 7 guard: every Step 7 fit goes through `window_years` (which raises if any returned year is >= t) and then `check_no_overlap(window, [t])`. `train_all_from_split` is not used here.
 - `window_years(strategy: str, t: int) -> tuple[int, ...]`: training years for strategy `"static"`, `"expanding"` or `"sliding"` at test year t (static: 2014-2016; expanding: 2014..t-1; sliding: t-3..t-1); raises if t is not in `TEST_YEARS` or if any returned year is >= t.
 - `run_window_strategy(df, strategy: str, model_name: str = "logreg") -> pd.DataFrame`: for each t: `check_no_overlap(window, [t])`, fit a new `Preprocessor` and model on the window only, predict t, compute metrics; returns one row per test year.
 - `run_incremental(df, model_name: str = "sgd") -> pd.DataFrame`: initial `fit` of `Preprocessor` and SGD on 2014-2016 (preprocessor frozen afterwards, so later years use the same mask and scaler: a limitation noted in the report); loop over t, record the prediction on t first, then `partial_fit` on year t with the true labels. Returns one row per test year.
