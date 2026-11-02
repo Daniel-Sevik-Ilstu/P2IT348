@@ -6,7 +6,8 @@ import sys
 
 import pandas as pd
 
-from src.config import RESULTS_DIR
+from src.config import RESULTS_DIR, TEST_YEARS, TRAIN_YEARS
+from src.preprocess import filter_report, prepare_split, split_table
 from src.drift import run_drift_analysis
 from src.data import (
     _row_hashes,
@@ -44,17 +45,35 @@ def run_step2(df: pd.DataFrame | None = None) -> dict[str, pd.DataFrame]:
     return tables
 
 
+def run_step3(df: pd.DataFrame | None = None) -> dict:
+    """Step 3: preprocess (fit on 2014-2016 only); writes results/step3_*."""
+    df = load_all() if df is None else df
+    split = prepare_split(df, TRAIN_YEARS, TEST_YEARS)
+    pre = split["preprocessor"]
+    counts = filter_report(df, pre, TRAIN_YEARS, TEST_YEARS)
+    table = split_table(split)
+    write_data_summary(counts, RESULTS_DIR / "step3_feature_counts")
+    write_data_summary(table, RESULTS_DIR / "step3_split")
+    pd.Series(pre.kept_features_, name="feature").to_csv(RESULTS_DIR / "step3_kept_features.csv", index=False)
+    print(f"Step 3: X_train {split['X_train'].shape} {split['X_train'].dtype}, X_test {split['X_test'].shape}")
+    print(counts.to_string(index=False))
+    print(table.to_string(index=False))
+    return split
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Run the pipeline (Steps 1-2 exist so far); --step N runs one step."""
+    """Run the pipeline (Steps 1-3 exist so far); --step N runs one step."""
     parser = argparse.ArgumentParser(description="Project 2 pipeline")
     parser.add_argument("--step", type=int, choices=range(1, 8), help="run a single step (1-7)")
     args = parser.parse_args(argv)
-    if args.step not in (None, 1, 2):
+    if args.step not in (None, 1, 2, 3):
         print(f"Step {args.step} is not implemented yet.", file=sys.stderr)
         return 1  # non-zero so callers can tell nothing ran
-    df = run_step1() if args.step in (None, 1, 2) else None
+    df = run_step1() if args.step in (None, 1, 2, 3) else None
     if args.step in (None, 2):
         run_step2(df)
+    if args.step in (None, 3):
+        run_step3(df)
     return 0
 
 
