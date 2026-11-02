@@ -32,3 +32,13 @@ One row per comment above, with the same number. Decision is Accepted or Rejecte
 
 | # | Decision | Reason | Fixed in commit |
 | --- | --- | --- | --- |
+| 1 | Accepted | The filter is leak-free but does not remove extreme z-scores (test max abs z reaches 212.7), so the plan's claim is wrong. Choose option b: add a fixed clip of scaled values to plus or minus 10, applied identically to train and test, using constants only and nothing learned from test. Update PLAN.md in its own commit with the reason, and report max abs z and the count of clipped entries before and after in docs/step3_preprocessing.md. | |
+| 2 | Accepted | Missing or partial years currently give a confusing sklearn error or a silently smaller split. After the split, raise ValueError naming any requested train or test year that is absent from the data. | |
+| 3 | Accepted | NaN and inf pass silently through log1p, and Step 7 will call Preprocessor on raw arrays. Add an isfinite check once per call in apply_log1p. | |
+| 4 | Accepted | Same-columns-same-order must not depend on the caller. In fit, raise if the number of names differs from the number of columns. In transform, raise if the column count differs from the training columns. Skip the optional feature_names parameter. | |
+| 5 | Rejected | A reporting refinement only: the 212 count has no effect on the model or on leakage. The dropped-column count is informational and the report already explains the two filters. Not worth the extra code for this step. | — |
+| 6 | Accepted | An unused train_years parameter is misleading. Remove it from filter_report. | |
+| 7 | Accepted | min_support below 1 would keep all-zero columns and contradict the plan. Raise ValueError if min_support is below 1. | |
+| 8 | Rejected | Not a bug: the step runs well within the 15-minute budget and peak memory was not measured. Reordering the mask and log1p is premature optimization and adds risk to a leakage-sensitive function. | — |
+| 9 | Rejected | Style and naming preferences with no effect on correctness. Renaming a shared helper and reordering imports would add churn to code that Steps 1 and 2 already depend on. | — |
+| 10 | Accepted | Docstring only: describe the class as sklearn-like (fit and transform), not sklearn-style. No inheritance change. | |
