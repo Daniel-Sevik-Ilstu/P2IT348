@@ -37,3 +37,12 @@ One row per comment above, with the same number. Decision is Accepted or Rejecte
 
 | # | Decision | Reason | Fixed in commit |
 | --- | --- | --- | --- |
+| 1 | Accepted | Mean KS over a different feature set per pair makes the year ranking not strictly comparable. Compute mean_ks over one fixed feature set for all pairs (features non-constant in at least one year) and fill skipped KS with 0 before averaging in top_drifting_features. | |
+| 2 | Accepted | The below-chance cell (0.362) shows scaler extrapolation from rare columns, not just concept drift. Apply the same minimum-support filter as Step 3 (keep columns non-zero in at least 10 training rows, computed on the training year only), then regenerate the matrix. Call it combined drift in the docstring and report, and explain any remaining low cell. | |
+| 3 | Accepted | Duplicates on both sides of the split inflate the diagonal. Report-only: put the duplicate counts per sample in the Step 2 report and state that the diagonal is optimistic. No code change to the split, since AGENTS.md says to keep duplicates. | |
+| 4 | Accepted | The comment that exact fails on tied counts is unsupported. Either verify it or switch to the default method auto, and fix the comment to say what was actually tested. | |
+| 5 | Accepted | Add input validation in ks_feature_table: raise ValueError for empty samples or missing features. The tester will cover the constant-at-different-values case, so the builder changes code only. | |
+| 6 | Accepted | Report-only: one sentence in the Step 2 report that share_significant is per pair and descriptive, not a family-wise test across the 28 pairs. | |
+| 7 | Rejected | Column naming preference only, with no effect on results. mean_YYYY sits next to mean_ks in a file the report already explains, and renaming adds churn to a working function. | — |
+| 8 | Rejected | Style preference: the Agg backend call and import order cause no bug. The venv note is valid, so I am running pip install -r requirements.txt myself instead of changing code. | — |
+| 9 | Accepted | Cheap check: record whether any LogisticRegression fit in the matrix raised a ConvergenceWarning and say so in one sentence in the report. Increase max_iter if one did. | |
