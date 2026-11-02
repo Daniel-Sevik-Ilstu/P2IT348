@@ -6,7 +6,15 @@ import argparse
 import pandas as pd
 
 from src.config import RESULTS_DIR
-from src.data import file_table, load_all, summarize_data, write_data_summary
+from src.data import (
+    _row_hashes,
+    feature_columns,
+    file_table,
+    label_conflict_mask,
+    load_all,
+    summarize_data,
+    write_data_summary,
+)
 
 
 def run_step1() -> pd.DataFrame:
@@ -18,6 +26,10 @@ def run_step1() -> pd.DataFrame:
     n_features = df.shape[1] - 2  # minus label and year
     print(f"Step 1: {len(df)} rows, {n_features} feature columns, memory {df.memory_usage().sum() / 1e6:.0f} MB")
     print(summary.to_string(index=False))
+    # Feature vectors that occur with both labels anywhere in the data (all years pooled).
+    hashes = _row_hashes(df)
+    conflict = label_conflict_mask(hashes, df["label"].to_numpy())
+    print(f"Label conflicts (all years pooled): {len(set(hashes[conflict]))} vectors, {int(conflict.sum())} rows")
     return df
 
 

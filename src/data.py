@@ -240,6 +240,12 @@ def _row_hashes(df: pd.DataFrame) -> np.ndarray:
     return pd.util.hash_pandas_object(df[feature_columns(df)], index=False).to_numpy()
 
 
+def label_conflict_mask(hashes: np.ndarray, labels: np.ndarray) -> np.ndarray:
+    """Boolean mask: True where the row's feature vector occurs with both labels in the given rows."""
+    n_labels = pd.Series(labels).groupby(hashes).transform("nunique").to_numpy()
+    return n_labels > 1
+
+
 def train_duplicate_mask(df: pd.DataFrame, train_years: tuple[int, ...] = TRAIN_YEARS) -> np.ndarray:
     """Boolean mask over df: True where a non-training row feature vector also occurs in a training-year row.
 
@@ -259,7 +265,9 @@ def summarize_data(df: pd.DataFrame, data_dir: Path = DATA_DIR) -> pd.DataFrame:
     all_zero_columns (zero in every row of the year), repeated_apknames (rows
     whose apkname already appeared earlier in the year), rows_in_earlier_years
     (feature vector occurs in an earlier year), test_rows_in_train and
-    test_share_in_train (test years only: vector occurs in 2014-2016).
+    test_share_in_train (test years only: vector occurs in 2014-2016),
+    conflict_vectors and conflict_rows (distinct feature vectors, and the rows
+    carrying them, that occur with both labels within the year).
     """
     feats = feature_columns(df)
     hashes = _row_hashes(df)
@@ -275,6 +283,7 @@ def summarize_data(df: pd.DataFrame, data_dir: Path = DATA_DIR) -> pd.DataFrame:
         earlier = np.isin(hashes[sel], hashes[years < year])
         is_test = year not in TRAIN_YEARS
         n = int(sel.sum())
+        conflict = label_conflict_mask(hashes[sel], sub[LABEL_COL].to_numpy())
         rows.append(
             {
                 "year": year,
@@ -287,6 +296,8 @@ def summarize_data(df: pd.DataFrame, data_dir: Path = DATA_DIR) -> pd.DataFrame:
                 "all_zero_columns": int((~sub[feats].to_numpy().any(axis=0)).sum()),
                 "repeated_apknames": int(apknames.duplicated().sum()),
                 "rows_in_earlier_years": int(earlier.sum()),
+                "conflict_vectors": int(pd.Series(hashes[sel][conflict]).nunique()),
+                "conflict_rows": int(conflict.sum()),
                 "test_rows_in_train": int(dup_train[sel].sum()) if is_test else np.nan,
                 "test_share_in_train": float(dup_train[sel].sum() / n) if is_test else np.nan,
             }
