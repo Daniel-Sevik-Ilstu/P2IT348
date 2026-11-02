@@ -318,7 +318,11 @@ def _to_markdown(df: pd.DataFrame) -> str:
     cols = list(df.columns)
     lines = ["| " + " | ".join(cols) + " |", "|" + "|".join("---" for _ in cols) + "|"]
     for _, row in df.iterrows():
-        cells = ["" if pd.isna(v) else (f"{v:.4f}" if isinstance(v, float) else str(v)) for v in row]
+        # Whole-number floats (ints that were upcast by NaN in their column) print as ints.
+        cells = [
+            "" if pd.isna(v) else (str(int(v)) if float(v).is_integer() else f"{v:.4f}") if isinstance(v, (int, float, np.number)) else str(v)
+            for v in row
+        ]
         lines.append("| " + " | ".join(cells) + " |")
     return "\n".join(lines) + "\n"
 
