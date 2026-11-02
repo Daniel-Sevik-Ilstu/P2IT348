@@ -27,7 +27,7 @@ Data facts used here come from AGENTS.md. Nothing in this plan has been run yet;
 random_state=42; features as float32/int32; pathlib paths relative to the repo root; docstrings and type hints on every function; one module per concern; cache in a git-ignored `cache/` folder (the loader may cache the combined matrix as `.npy`); small commits tagged `[builder]`.
 
 ### Shared constants (`src/config.py`)
-`ROOT`, `DATA_DIR`, `RESULTS_DIR`, `DOCS_DIR`, `SEED = 42`, `TRAIN_YEARS = (2014, 2015, 2016)`, `TEST_YEARS = (2017, ..., 2021)`, `TUNE_TRAIN_YEARS = (2014, 2015)`, `TUNE_VAL_YEAR = 2016`, `N_RAW_COLUMNS = 1849`, `LABEL_COL = "label"`, `YEAR_COL = "year"`.
+`ROOT`, `DATA_DIR`, `RESULTS_DIR`, `DOCS_DIR`, `SEED = 42`, `MIN_SUPPORT = 10`, `TRAIN_YEARS = (2014, 2015, 2016)`, `TEST_YEARS = (2017, ..., 2021)`, `TUNE_TRAIN_YEARS = (2014, 2015)`, `TUNE_VAL_YEAR = 2016`, `N_RAW_COLUMNS = 1849`, `LABEL_COL = "label"`, `YEAR_COL = "year"`.
 
 ### Entry point (`src/main.py`)
 `main(argv: list[str] | None = None) -> int`. `python -m src.main` runs Steps 1-7 in order; `--step N` (1-7) runs one step (running it first runs any earlier step it needs, using the cache). Prints a short summary, writes `results/`. Target: under about 15 minutes in total (see runtime notes per step).
@@ -85,22 +85,22 @@ random_state=42; features as float32/int32; pathlib paths relative to the repo r
 
 ## Step 3: Preprocess (`src/preprocess.py`)
 
-**Approach.** `log1p` to tame the heavy tail (counts up to ~92,000), drop features that are all-zero in the training years, then `StandardScaler` fit on training years only. Output float32.
+**Approach.** `log1p` to tame the heavy tail (counts up to ~92,000), drop features that are non-zero in fewer than `MIN_SUPPORT = 10` training rows (this includes all-zero columns), then `StandardScaler` fit on training years only. Output float32. The minimum-support filter stops columns that are almost constant in training from getting huge z-scores on drifted test years.
 
 **Functions.**
 - `check_no_overlap(train_years: Iterable[int], test_years: Iterable[int]) -> None`: raises `ValueError` if they share a year, if either is empty, or if `max(train_years) >= min(test_years)`. Not called by Step 2's `concept_drift_matrix` (exempt, see section 0).
 - `split_by_year(df, train_years, test_years) -> tuple[pd.DataFrame, pd.DataFrame]`: calls `check_no_overlap`, returns the train and test frames (rows selected by `year`).
 - `apply_log1p(X: np.ndarray) -> np.ndarray`: `np.log1p` as float32; raises on negative input.
-- `nonzero_feature_mask(X_train: np.ndarray) -> np.ndarray`: boolean mask of columns with any non-zero value in the training rows only.
+- `nonzero_feature_mask(X_train: np.ndarray, min_support: int = MIN_SUPPORT) -> np.ndarray`: boolean mask of columns with at least `min_support` (10) non-zero values in the training rows only. `MIN_SUPPORT = 10` is added to `src/config.py`.
 - `class Preprocessor` (sklearn-style): `fit(X_train_raw: np.ndarray) -> Preprocessor` (applies log1p, learns the mask, fits `StandardScaler`), `transform(X_raw: np.ndarray) -> np.ndarray` (log1p, mask, scale), `fit_transform`, attribute `kept_features_` (names/indices). Raises if `transform` is called before `fit`.
 - `prepare_split(df, train_years, test_years) -> dict`: returns `X_train, y_train, years_train, X_test, y_test, years_test, preprocessor`; the preprocessor is fit on the training rows only.
 - `make_tuning_split(df) -> dict`: same, with train 2014-2015 and validate 2016.
 
-**Decision flagged.** Dropping all-zero training columns is only a size reduction (such columns have zero variance and no information in training), but a column that is non-zero only in a later year is lost for the static model. That loss is real drift and is reported (count of columns active in test years but dropped). Step 7 refits the mask on each window, which recovers them.
+**Decision flagged.** Dropping all-zero training columns is only a size reduction (such columns have zero variance and no information in training). Dropping columns with 1-9 non-zero training rows is a deliberate extra filter (support below 10), chosen because a tiny training std turns ordinary test values into z-scores in the hundreds. A column that is non-zero only in a later year is lost for the static model. That loss is real drift and is reported (count of columns active in test years but dropped). Step 7 refits the mask on each window, which recovers them.
 
-**Report.** `docs/step3_preprocessing.md`: log1p and why, number of columns dropped, scaler details, the split table above, and the five leakage rules.
+**Report.** `docs/step3_preprocessing.md`: log1p and why, number of columns dropped (split into all-zero and low-support 1-9 rows), the minimum-support rule (`MIN_SUPPORT = 10`, training rows only) and why, scaler details, the split table above, and the five leakage rules.
 
-**Testing.** Synthetic: scaler mean/std come from training rows only (train mean ~0, std ~1; test is not centred on its own mean); the mask comes from training only (a column non-zero only in a test row is dropped); `log1p` equals `np.log1p`, negative input raises; `check_no_overlap` raises on overlap and on train years after test years (e.g. train 2018-2020 / test 2014); `transform` before `fit` raises. Leakage test on the real or synthetic frame: no `year` appears in both the train and test outputs of `prepare_split`, and training years are exactly 2014-2016. Changing test rows must not change the fitted scaler (fit twice, compare `mean_`).
+**Testing.** Synthetic: scaler mean/std come from training rows only (train mean ~0, std ~1; test is not centred on its own mean); the mask comes from training only (a column non-zero only in a test row is dropped); near-constant column: a column non-zero in 9 training rows is dropped and one non-zero in 10 is kept, and a test value in a dropped column cannot produce a large z-score; `log1p` equals `np.log1p`, negative input raises; `check_no_overlap` raises on overlap and on train years after test years (e.g. train 2018-2020 / test 2014); `transform` before `fit` raises. Leakage test on the real or synthetic frame: no `year` appears in both the train and test outputs of `prepare_split`, and training years are exactly 2014-2016. Changing test rows must not change the fitted scaler (fit twice, compare `mean_`).
 
 ---
 
