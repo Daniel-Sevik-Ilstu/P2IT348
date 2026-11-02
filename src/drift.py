@@ -20,7 +20,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-from src.config import ALL_YEARS, LABEL_COL, RESULTS_DIR, SEED, YEAR_COL
+from src.config import ALL_YEARS, LABEL_COL, MIN_SUPPORT, RESULTS_DIR, SEED, YEAR_COL
 from src.data import feature_columns
 
 
@@ -152,9 +152,11 @@ def top_drifting_features(
 def concept_drift_matrix(samples: dict[int, pd.DataFrame], features: list[str], seed: int = SEED) -> pd.DataFrame:
     """Accuracy matrix: rows = training year i, columns = test year j.
 
-    Per year i: log1p + StandardScaler + LogisticRegression, all fit on year i's training part only.
-    The diagonal uses a stratified 70/30 split of year i (accuracy on the held-out 30%); off-diagonal
-    cells use the whole sample of year j.
+    Measures combined drift (covariate shift plus concept drift), not concept drift alone.
+    Per year i: log1p, then keep columns non-zero in at least MIN_SUPPORT rows of year i's training
+    part (stops near-constant columns getting huge z-scores on other years), then StandardScaler +
+    LogisticRegression, all fit on year i's training part only. The diagonal uses a stratified 70/30
+    split of year i (accuracy on the held-out 30%); off-diagonal cells use the whole sample of year j.
     """
     years = sorted(samples)
     acc = pd.DataFrame(np.nan, index=years, columns=years)
@@ -162,14 +164,16 @@ def concept_drift_matrix(samples: dict[int, pd.DataFrame], features: list[str], 
         x = np.log1p(samples[i][features].to_numpy(dtype=np.float64))
         y = samples[i][LABEL_COL].to_numpy()
         x_tr, x_ho, y_tr, y_ho = train_test_split(x, y, test_size=0.3, stratify=y, random_state=seed)
+        # Minimum-support mask from year i's training rows only (same rule as Step 3).
+        keep = (x_tr > 0).sum(axis=0) >= MIN_SUPPORT
         # Scaler and model see year i's training rows only.
-        scaler = StandardScaler().fit(x_tr)
-        model = LogisticRegression(max_iter=1000, random_state=seed).fit(scaler.transform(x_tr), y_tr)
+        scaler = StandardScaler().fit(x_tr[:, keep])
+        model = LogisticRegression(max_iter=1000, random_state=seed).fit(scaler.transform(x_tr[:, keep]), y_tr)
         for j in years:
             if j == i:
-                acc.loc[i, j] = accuracy_score(y_ho, model.predict(scaler.transform(x_ho)))
+                acc.loc[i, j] = accuracy_score(y_ho, model.predict(scaler.transform(x_ho[:, keep])))
             else:
-                xj = np.log1p(samples[j][features].to_numpy(dtype=np.float64))
+                xj = np.log1p(samples[j][features].to_numpy(dtype=np.float64))[:, keep]
                 acc.loc[i, j] = accuracy_score(samples[j][LABEL_COL].to_numpy(), model.predict(scaler.transform(xj)))
     return acc
 
