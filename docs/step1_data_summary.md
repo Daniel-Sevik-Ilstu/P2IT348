@@ -4,11 +4,11 @@ Written by the builder agent. All numbers below come from running `python -m src
 
 ## What was done
 
-1. `list_data_files` lists every `*.csv` in `input_data/` (names starting with `._` are skipped as macOS resource-fork files), runs `parse_filename` on each, and raises if any other CSV does not match `sampled_<YEAR>_<malware|benign>_api.csv`, or if the 16 year/class files are not all present exactly once.
-2. `load_file` reads the header, checks it has 1,849 unique columns and that column 0 is `apkname`, then drops column 0 by position (`usecols`) and reads the 1,848 features as `int32`. Missing, non-integer or negative values raise. No row count is assumed.
+1. `list_data_files` lists every `*.csv` in `input_data/` (names starting with `._` are skipped as macOS resource-fork files from the zip, not data; this is a deliberate rule), runs `parse_filename` on each, and raises if any other CSV does not match `sampled_<YEAR>_<malware|benign>_api.csv`, or if the 16 year/class files are not all present exactly once.
+2. `load_file` reads the header, checks the raw header (read with the `csv` module, so duplicated names are caught) has 1,849 unique columns and that column 0 is `apkname`, then drops column 0 by position (`usecols`) and reads the 1,848 features as `int32`. Missing, non-integer or negative values raise, and so does a file with no data rows. No row count is assumed.
 3. `label` (int8; malware = 1, benign = 0) and `year` (int16) come only from the file name.
 4. `load_year` and `combine_years` concatenate the files, after checking every file has the same feature columns in the same order.
-5. `load_all` caches the combined frame in the git-ignored `cache/` folder, keyed on file names, sizes, mtimes and `CACHE_SCHEMA_VERSION`. The feature column names are stored in the cache, and the schema check is rerun against the CSV header on every cache load.
+5. `load_all` caches the combined frame in the git-ignored `cache/` folder, keyed on file names, sizes, mtimes and `CACHE_SCHEMA_VERSION`. The feature column names are stored in the cache, and the schema check is rerun against the CSV header on every cache load (also: `label` in {0,1}, `year` in 2014-2021, no NaN, equal lengths). A corrupt or truncated cache file is ignored and rebuilt from the CSVs.
 
 ## Files loaded
 
@@ -85,12 +85,26 @@ Duplicate feature vectors are common in every year (40-73% of rows), not only in
 | 2020 | 3000 | 67 | 2.2% | 1246 |
 | 2021 | 3000 | 2 | 0.1% | 1461 |
 
-A third of the 2017 test rows are exact copies of a training row, which makes 2017 look easier than it is. The overlap falls with distance from the training years. I did not check whether duplicate vectors ever carry different labels.
+A third of the 2017 test rows are exact copies of a training row, which makes 2017 look easier than it is. The overlap falls with distance from the training years. 
+**3b. Label conflicts (review comment 1).** Some feature vectors occur with both labels. Per year (within the year), distinct conflicting vectors and the rows that carry them:
+
+| year | rows | conflicting vectors | rows in conflict | % of rows |
+|---|---|---|---|---|
+| 2014 | 18000 | 8 | 282 | 1.6% |
+| 2015 | 18000 | 11 | 431 | 2.4% |
+| 2016 | 18000 | 9 | 666 | 3.7% |
+| 2017 | 18000 | 12 | 1814 | 10.1% |
+| 2018 | 18000 | 48 | 6577 | 36.5% |
+| 2019 | 3000 | 3 | 79 | 2.6% |
+| 2020 | 3000 | 8 | 116 | 3.9% |
+| 2021 | 3000 | 5 | 517 | 17.2% |
+
+With all years pooled, 107 distinct vectors occur with both labels, covering 13,719 of the 99,000 rows (13.9%). Those rows cannot all be classified correctly by any model that uses these features, and a test row equal to a training row can carry the opposite label. No rows were dropped. (The per-year figures are within-year; the pooled figure also counts conflicts across years. The pooled count matches the reviewer's independent check.)
 
 **4. All-zero columns.** Between 810 and 916 of the 1,848 features are all-zero within a single year (about 44-50%), consistent with the 850-1,125 per file in AGENTS.md. These are per-year counts; I did not count columns that are all-zero across all 99,000 rows.
 
 ## Not done / limits
 
-- No tests were written (the tester agent owns `tests/`); `python harness.py test 1` was not run by me.
-- `src/main.py` only implements Step 1 so far; `--step 2..7` prints "not implemented yet".
+- I wrote no tests (the tester agent owns `tests/`). After the review fixes, `python harness.py test all` gives 42 passed, 2 failed; the 2 failures (`test_combine_years_row_count_and_columns`, `test_combine_years_labels_balanced_per_year`) build a two-year folder, which `list_data_files` rejects by design. The student rejected them as test errors, so `src/` was not changed for them.
+- `src/main.py` only implements Step 1 so far; `--step 2..7` prints "not implemented yet" to stderr and exits with code 1.
 - Cache: I observed the plain build (about 8-9 s), the cache hit (about 1 s, frame equal to the fresh build), and rejection of a cache whose feature names were altered (swapped two names in a copy; `load_all` rebuilt from the CSVs and the next call hit the new cache). Rebuild after touching a CSV (changed mtime) was not exercised on the real files.
