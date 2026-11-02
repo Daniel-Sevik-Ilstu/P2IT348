@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import re
+import zipfile
 from pathlib import Path
 
 import numpy as np
@@ -202,10 +203,13 @@ def _read_cache(key: str, cache_dir: Path) -> pd.DataFrame | None:
             if str(z["key"]) != key:
                 return None
             feats = [str(c) for c in z["columns"]]
-            feature_df = pd.DataFrame(z["X"], columns=feats)
-            extra = pd.DataFrame({LABEL_COL: z["label"].astype(np.int8), YEAR_COL: z["year"].astype(np.int16)})
-    except (OSError, ValueError, KeyError):
-        return None
+            x, label, year = z["X"], z["label"], z["year"]
+            if not (len(x) == len(label) == len(year)):
+                return None  # X, label and year must line up
+            feature_df = pd.DataFrame(x, columns=feats)
+            extra = pd.DataFrame({LABEL_COL: label.astype(np.int8), YEAR_COL: year.astype(np.int16)})
+    except (OSError, ValueError, KeyError, EOFError, zipfile.BadZipFile):
+        return None  # missing, truncated or corrupt cache: rebuild from the CSVs
     return pd.concat([feature_df, extra], axis=1)
 
 
