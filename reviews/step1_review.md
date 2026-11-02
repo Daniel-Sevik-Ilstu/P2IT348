@@ -34,13 +34,13 @@ One row per comment above, with the same number. Decision is Accepted or Rejecte
 
 | # | Decision | Reason | Fixed in commit |
 | --- | --- | --- | --- |
-| 1 | Accepted | Feature vectors that appear with both labels cap achievable accuracy and make a duplicated test row carry the opposite label. Add a per-year count of label-conflicting vectors and rows to the summary and the Step 1 report. Do not drop any rows. | |
-| 2 | Accepted | The duplicate-column-name check can never fire because pandas renames duplicates. Read the raw header with the csv module so a real duplicate is caught, and add a duplicated-header test. | |
-| 3 | Accepted | A header-only or truncated file must fail loudly. Raise ValueError when a file has zero rows. Skip the optional warning about differing row counts. | |
-| 4 | Accepted | The docstring and PLAN say a failed cache check rebuilds from the CSVs. Catch zipfile.BadZipFile and EOFError in _read_cache so a corrupt cache rebuilds instead of crashing. | |
-| 5 | Accepted | Labels and year grouping depend on these. On cache load check label is in 0 and 1, year is in 2014 to 2021, there are no NaN values, and X, label and year have equal length. | |
-| 6 | Accepted | Exiting with code 0 for steps that are not built hides that nothing ran. Return a non-zero exit code for steps not yet implemented. | |
-| 7 | Accepted | Trivial and safe: use len(feature_columns(df)) instead of the hard-coded minus 2. | |
+| 1 | Accepted | Feature vectors that appear with both labels cap achievable accuracy and make a duplicated test row carry the opposite label. Add a per-year count of label-conflicting vectors and rows to the summary and the Step 1 report. Do not drop any rows. | 5f8e4d7, d146326 |
+| 2 | Accepted | The duplicate-column-name check can never fire because pandas renames duplicates. Read the raw header with the csv module so a real duplicate is caught, and add a duplicated-header test. | 6f91401 |
+| 3 | Accepted | A header-only or truncated file must fail loudly. Raise ValueError when a file has zero rows. Skip the optional warning about differing row counts. | 640466a |
+| 4 | Accepted | The docstring and PLAN say a failed cache check rebuilds from the CSVs. Catch zipfile.BadZipFile and EOFError in _read_cache so a corrupt cache rebuilds instead of crashing. | 5e308c5 |
+| 5 | Accepted | Labels and year grouping depend on these. On cache load check label is in 0 and 1, year is in 2014 to 2021, there are no NaN values, and X, label and year have equal length. | f36c6a3 |
+| 6 | Accepted | Exiting with code 0 for steps that are not built hides that nothing ran. Return a non-zero exit code for steps not yet implemented. | efba8eb |
+| 7 | Accepted | Trivial and safe: use len(feature_columns(df)) instead of the hard-coded minus 2. | 34ae556 |
 | 8 | Rejected | Skipping files that start with ._ was my explicit instruction to the builder: they are macOS archive junk from the zip, not data. A real misnamed data file starting with ._ is not plausible. Keeping the code unchanged, one sentence in the report is enough. | — |
 | 9 | Rejected | Only the Markdown display is affected, and the CSV holds the full-precision values and is the source of truth. This is a style preference and would cause churn in a working function. | — |
 | 10 | Rejected | Efficiency only, with no bug. 16 filename parses are negligible, and changing function signatures now risks breaking the tester's tests for no benefit. | — |
