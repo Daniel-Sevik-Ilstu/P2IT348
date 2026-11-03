@@ -50,7 +50,9 @@ def split_by_year(
 
 
 def apply_log1p(X: np.ndarray) -> np.ndarray:
-    """Return log(1 + X) as float32; raises ValueError on negative input (counts must be >= 0)."""
+    """Return log(1 + X) as float32; raises ValueError on NaN/inf or negative input (counts must be finite and >= 0)."""
+    if not np.isfinite(X).all():  # checked once here, so fit and transform each pay for it once per call
+        raise ValueError("log1p input must be finite (no NaN or inf)")
     if X.size and X.min() < 0:
         raise ValueError("log1p input must be non-negative")
     return np.log1p(X, dtype=np.float32)
