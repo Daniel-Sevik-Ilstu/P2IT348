@@ -51,7 +51,9 @@ One row per test function.
 One row per failing test. Decision is "Accepted" (the test is right; the builder fixes the code) or "Rejected" (the test is wrong; the tester fixes the test). Add the commit with the fix.
 
 | Test | Cause | Decision | Fixed in commit |
-| --- | --- | --- | --- |
+| test_split_by_year_missing_requested_year_fails_loudly | The code does not check that the requested years exist in the data, so a missing year gives no error. The test is right. Same defect as review comment 2 (accepted). | Accepted | |
+| test_prepare_split_missing_test_year_fails_loudly | A missing test year (2019) silently gives a smaller split. The test is right. Same defect as review comment 2. | Accepted | |
+| test_nan_in_input_raises_or_yields_finite_output | NaN passes through log1p and StandardScaler and appears in the model input. The test is right. Same defect as review comment 3 (accepted). | Accepted | |
 
 ## Runs (added by `python harness.py test N`; do not edit)
 
