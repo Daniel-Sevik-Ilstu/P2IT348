@@ -1,6 +1,6 @@
 # Step 7 Report: Sustainable Approach
 
-Written by the builder agent. All numbers come from `python -m src.main` (whole pipeline, 6 min 54 s on this machine, 12 cores; `--step 7` alone is similar because it also trains the Step 4 models). Files are in `results/step7_*`.
+Written by the builder agent. All numbers come from `python -m src.main` (whole pipeline on this machine, 12 cores; `--step 7` alone is similar because it also trains the Step 4 models). Files are in `results/step7_*`.
 
 ## Approach
 
@@ -88,19 +88,21 @@ Consequences: (1) the expanding window and the incremental model are about 94-97
 
 ## Cost
 
-Training seconds per update (`results/step7_cost.csv|md`; this machine, 12 cores, times vary by a few seconds between runs; includes preprocessing fit for (b) and (c)):
+Training seconds per update (`results/step7_cost.csv|md`; this machine, 12 cores, times vary by a few seconds between runs). The static seconds are the Step 4 model fit and exclude preprocessing; the expanding and sliding seconds and the incremental initial fit include the preprocessing fit, so static is not like for like.
 
-| Strategy | Classifier | Fits / updates | Total seconds | Mean seconds per update | Mean training rows |
-|---|---|---|---|---|---|
-| static | logreg | 1 | 2.65 | 2.65 | 54,000 |
-| expanding | logreg | 5 | 54.36 | 10.87 | 81,000 |
-| sliding | logreg | 5 | 31.32 | 6.26 | 45,000 |
-| static | sgd | 1 | 5.02 | 5.02 | 54,000 |
-| expanding | sgd | 5 | 61.60 | 12.32 | 81,000 |
-| sliding | sgd | 5 | 40.28 | 8.06 | 45,000 |
-| incremental | sgd | 5 (1 initial fit + 4 updates counted before predictions) | 7.36 | 1.47 (initial fit 7.13 s, each update about 0.06 s) | 19,200 |
-| static | random forest | 1 | 8.18 | 8.18 | 54,000 |
-| expanding | random forest | 5 | 100.56 | 20.11 | 81,000 |
+| Strategy | Classifier | Fits / updates | Total seconds | Mean seconds per update | Mean training rows | Rows per incremental update |
+|---|---|---|---|---|---|---|
+| static | logreg | 1 | 2.88 | 2.88 | 54,000 | |
+| expanding | logreg | 5 | 59.20 | 11.84 | 81,000 | |
+| sliding | logreg | 5 | 25.98 | 5.20 | 45,000 | |
+| static | sgd | 1 | 3.93 | 3.93 | 54,000 | |
+| expanding | sgd | 5 | 52.02 | 10.40 | 81,000 | |
+| sliding | sgd | 5 | 31.81 | 6.36 | 45,000 | |
+| incremental | sgd | 5 | 5.94 | 1.19 | 54,000 (initial fit) | 10,500 |
+| static | random forest | 1 | 8.16 | 8.16 | 54,000 | |
+| expanding | random forest | 5 | 82.22 | 16.44 | 81,000 | |
+
+For the incremental model, the longest time (5.75 s) is the initial fit on 2014-2016 and the other four updates take only a fraction of a second each (about 0.05 s on average, worked out from the totals). An incremental update is therefore about two orders of magnitude cheaper than a refit (a few hundredths of a second against 5-16 s), and in these results it is as accurate as the sliding window (pooled F1 0.9053 vs 0.9013 for SGD).
 
 For the incremental model the seconds in a row are those of the update that produced the model used for that row (the 2017 row holds the initial fit); the update after 2021 is not counted since no later year is predicted. An incremental update is two orders of magnitude cheaper than a refit (about 0.06 s per year against 6-20 s), and in these results it is as accurate as the sliding window (pooled F1 0.9053 vs 0.9013 for SGD). Whole pipeline: 6 min 54 s, within the 15-minute budget.
 
@@ -114,7 +116,7 @@ For the incremental model the seconds in a row are those of the update that prod
 ## Conclusions for REPORT.md
 
 - **Retrain once a year at least; it recovers ~0.9 accuracy but only after the shifted year is labelled.** Models updated with 2019 data score 0.89-0.94 accuracy on 2020-2021 against 0.50-0.51 for the never-updated model (mean F1 over 2017-2021: 0.86-0.89 against 0.77-0.79). Retraining on data up to 2018 did nothing for 2019 (accuracy 0.54-0.56): no yearly schedule avoids the first collapsed year.
-- **Prefer cheaper updates, but do not expect them to fix sudden drift.** Updating beats the static model from 2020 onward, and sliding-window and incremental updates reached similar 2020-2021 results to the expanding window (logreg sliding mean F1 0.8851, SGD incremental 0.8740) at lower cost (sliding about 6 s per refit with logreg; incremental about 0.06 s per year after a 7 s initial fit; expanding 11-20 s per refit on 81,000 rows on average). The differences between these strategies are small and come from one seed with no uncertainty estimate, so they should not be ranked. No strategy recovered 2019, so none of them is sustainable across all years. Caveat: window sizes and year mix differ, so recency is not isolated.
+- **Prefer cheaper updates, but do not expect them to fix sudden drift.** Updating beats the static model from 2020 onward, and sliding-window and incremental updates reached similar 2020-2021 results to the expanding window (logreg sliding mean F1 0.8851, SGD incremental 0.8740) at lower cost (sliding about 5 s per refit with logreg; incremental about 6 s in total, almost all of it the initial fit; expanding 10-16 s per refit on 81,000 rows on average). The differences between these strategies are small and come from one seed with no uncertainty estimate, so they should not be ranked. No strategy recovered 2019, so none of them is sustainable across all years. Caveat: window sizes and year mix differ, so recency is not isolated.
 - **Trigger retraining from the label-free output and a labelled check, not from Step 2 KS feature drift.** The KS statistic between consecutive years did not flag 2019 (0.0277 for 2018 to 2019, against 0.023-0.028 for every other pair up to 2020); its largest step was 2020 to 2021 (0.0487), when a retrain on 2019-2020 data was already working. The concept-drift signal did flag it: in Step 2 the 2018 model scores 0.97 on 2018 and 0.60 on 2019. Step 6 shows a cheap warning that needs no labels: the share of apps predicted malware jumped from 0.46-0.47 to 0.94-0.98 in 2019-2021 on a test set known to be 50% malware (in real data the true share is unknown, so this needs a reference). Recommended trigger: accuracy or recall/precision on a small, freshly labelled sample of the newest year, with the predicted-malware share as an early warning.
 - **After a trigger, retrain on the new year's labelled data immediately.** Because the 2019 repair needed only 3,000 labelled rows (3% of the window), a small labelled sample of the new year is enough to restart, and the labelling delay is then the main sustainability cost, not compute.
 - **What was not shown:** a gradual drift schedule (only one abrupt shift occurs in 2017-2021), random forest with sliding or incremental updates, and equal-row windows.
