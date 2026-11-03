@@ -251,16 +251,26 @@ def summary_table(results: pd.DataFrame) -> pd.DataFrame:
 
 
 def cost_table(results: pd.DataFrame) -> pd.DataFrame:
-    """Training cost per (strategy, classifier): number of fits/updates, total and mean seconds, mean training rows."""
+    """Training cost per (strategy, classifier): number of fits/updates, total and mean seconds, rows per fit.
+
+    mean_train_rows: mean rows of a full fit (incremental: the initial fit only); update_rows: mean rows of one
+    `partial_fit` update (incremental only). Static seconds come from Step 4 and exclude preprocessing; window and
+    incremental-initial seconds include the preprocessing fit.
+    """
     rows = []
     for (strategy, clf), g in results.groupby(["strategy", "classifier"], sort=False):
         if strategy == "static":
             secs = g["train_seconds"].iloc[:1]  # one fit, paid once
         else:
             secs = g["train_seconds"]
-        rows.append({"strategy": strategy, "classifier": clf, "n_fits": len(secs), "total_seconds": secs.sum(min_count=1),  # NaN (not 0.0) when the seconds are unknown
+        if strategy == "incremental":  # first row = initial fit; later rows = partial_fit on one year each
+            fit_rows, update_rows = float(g["train_rows"].iloc[0]), float(g["train_rows"].iloc[1:].mean())
+        else:
+            fit_rows, update_rows = float(g["train_rows"].mean()), float("nan")
+        rows.append({"strategy": strategy, "classifier": clf, "n_fits": len(secs),
+                     "total_seconds": secs.sum(min_count=1),  # NaN (not 0.0) when the seconds are unknown
                      "mean_seconds_per_update": secs.mean(), "max_seconds": secs.max(),
-                     "mean_train_rows": g["train_rows"].mean()})
+                     "mean_train_rows": fit_rows, "update_rows": update_rows})
     return pd.DataFrame(rows)
 
 
@@ -338,5 +348,9 @@ def run_sustainable(
     save_table(results, "step7_strategies_detail")  # + confusion counts, cost, window
     for name in ("pooled", "vs_static", "summary", "cost", "window_composition"):
         save_table(tables[name], f"step7_{name}")
+    with open(RESULTS_DIR / "step7_cost.md", "a", encoding="utf-8") as f:
+        f.write("\nNotes: static seconds are the Step 4 model fit and exclude preprocessing; expanding, sliding and the "
+                "incremental initial fit include the preprocessing fit. mean_train_rows is the rows of a full fit "
+                "(incremental: the initial fit); update_rows is the mean rows of one incremental partial_fit.\n")
     plot_strategies(results, RESULTS_DIR / "step7_f1_by_year.png")
     return tables

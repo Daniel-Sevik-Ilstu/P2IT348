@@ -549,3 +549,11 @@ def test_cost_table_reports_nan_not_zero_when_static_seconds_missing():
     out = sustainable.static_from_models(split, models, train_seconds=None)
     cost = sustainable.cost_table(out)
     assert cost["total_seconds"].isna().all() and cost["mean_seconds_per_update"].isna().all()
+
+
+def test_cost_table_incremental_update_rows_separate(all_results):
+    """Review comment 4: incremental update sizes are in update_rows, not mixed into mean_train_rows."""
+    cost = sustainable.cost_table(all_results).set_index(["strategy", "classifier"])
+    inc = cost.loc[("incremental", "sgd")]
+    assert inc["mean_train_rows"] == 900 and inc["update_rows"] == 300
+    assert cost.drop(index=("incremental", "sgd"))["update_rows"].isna().all()
