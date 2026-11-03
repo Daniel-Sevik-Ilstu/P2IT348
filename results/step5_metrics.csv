@@ -1,4 +1,4 @@
-model,accuracy,precision,recall,f1,n_test
-logreg,0.86,0.8196,0.9232,0.8683,45000
-random_forest,0.8658,0.8228,0.9324,0.8742,45000
-sgd,0.8358,0.8063,0.8841,0.8434,45000
+model,accuracy,precision,recall,f1,n_test,baseline_accuracy
+logreg,0.86,0.8196,0.9232,0.8683,45000,0.5
+random_forest,0.8658,0.8228,0.9324,0.8742,45000,0.5
+sgd,0.8358,0.8063,0.8841,0.8434,45000,0.5
