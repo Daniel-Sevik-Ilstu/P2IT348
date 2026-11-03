@@ -101,6 +101,8 @@ def run_step5(
     X_test, y_test, years_test = split["X_test"], split["y_test"], split["years_test"]
     assert_test_years_only(years_test)
     main_table = pooled_table(models, X_test, y_test)
+    base = baseline_accuracy(y_test)
+    main_table["baseline_accuracy"] = base  # majority-class reference for the accuracy column
     # Mask over all rows of df; select the test rows (split_by_year keeps df order).
     dup_mask = train_duplicate_mask(df)[df["year"].isin(TEST_YEARS).to_numpy()]
     no_dup, _ = sensitivity_tables(models, X_test, y_test, years_test, dup_mask)
@@ -108,7 +110,6 @@ def run_step5(
     save_table(main_table, "step5_metrics")
     save_table(no_dup, "step5_pooled_no_dup")
     save_table(confusion, "step5_confusion")
-    base = baseline_accuracy(y_test)
     print(f"Step 5 (pooled test years, n={len(y_test)}; majority-class accuracy {base:.4f}):")
     print(main_table.round(4).to_string(index=False))
     base_nd = baseline_accuracy(y_test[~dup_mask])
