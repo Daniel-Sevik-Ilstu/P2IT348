@@ -30,3 +30,11 @@ One row per comment above, with the same number. Decision is Accepted or Rejecte
 
 | # | Decision | Reason | Fixed in commit |
 | --- | --- | --- | --- |
+| 1 | Accepted | Retraining the same models in Step 5 wastes runtime and means Step 4 and Step 5 describe different objects. Let run_step5 take the models from run_step4 and train only when none are passed, so --step 5 alone still works. | |
+| 2 | Accepted | Partly: add a check that X_test and y_test have equal length in pooled_table and confusion_table. Do not change the function signatures, because the tester writes tests against the signatures in PLAN.md. | |
+| 3 | Accepted | The no-duplicate subset changes the class mix, so the precision drop is partly a base-rate effect. Add kept and excluded counts per class (malware and benign) to the sensitivity table and state the majority-class accuracy of the subset in the Step 5 report. | |
+| 4 | Rejected | The reviewer confirms the situation does not occur: tp is above 0 for all models, and zero_division=0 follows PLAN.md. The per-year slices in Step 6 have 3,000 to 18,000 rows. An extra flag column adds clutter to every results table for a case that is not present. | — |
+| 5 | Accepted | A clear message beats an unclear sklearn error. Raise ValueError when keep.sum() is 0. The explicit length assert in run_step5 is optional and can be skipped. | |
+| 6 | Accepted | The 0.86 accuracy cannot be read in context from the CSV alone. Add a baseline_accuracy column to results/step5_metrics.csv (it is 0.5 on the balanced test set). | |
+| 7 | Accepted | The entry point is main.run_step5, consistent with Steps 1 to 4, so update PLAN.md to say so, in its own commit with the reason. Also add a one-line note to docs/step5_evaluation.md that 2017 and 2018 make up 80 percent of the pooled test set. | |
+| 8 | Rejected | Style preference on main.py structure, already declined in Steps 1 to 4. Refactoring the step dispatch now adds churn without changing any result. | — |
