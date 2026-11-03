@@ -10,10 +10,15 @@ from src.config import RESULTS_DIR, TEST_YEARS, TRAIN_YEARS
 from src.evaluate import (
     assert_test_years_only,
     baseline_accuracy,
+    by_year_export,
     confusion_table,
+    drift_summary,
+    per_year_table,
+    plot_by_year,
     pooled_table,
     save_table,
     sensitivity_tables,
+    year_baseline_table,
 )
 from src.models import save_models, train_all_from_split, train_with_report
 from src.preprocess import filter_report, prepare_split, split_table
@@ -120,12 +125,44 @@ def run_step5(
     return {"metrics": main_table, "no_dup": no_dup, "confusion": confusion}
 
 
+def run_step6(
+    df: pd.DataFrame | None = None, split: dict | None = None, models: dict | None = None
+) -> dict[str, pd.DataFrame]:
+    """Step 6: per-year evaluation of the three classifiers on 2017-2021; writes results/step6_*.
+
+    models: fitted Step 4 classifiers to reuse; trained on 2014-2016 here only when None (e.g. --step 6 alone).
+    Nothing is refit on a test year.
+    """
+    df = load_all() if df is None else df
+    split = prepare_split(df, TRAIN_YEARS, TEST_YEARS) if split is None else split
+    if models is None:
+        models = train_all_from_split(split)  # fit on 2014-2016 only
+    X_test, y_test, years_test = split["X_test"], split["y_test"], split["years_test"]
+    assert_test_years_only(years_test)
+    per_year = per_year_table(models, X_test, y_test, years_test)
+    baseline = year_baseline_table(y_test, years_test)
+    drift = drift_summary(per_year)
+    # Sensitivity: only test rows with no exact duplicate in 2014-2016 (mask is over all rows of df).
+    dup_mask = train_duplicate_mask(df)[df["year"].isin(TEST_YEARS).to_numpy()]
+    _, per_year_nd = sensitivity_tables(models, X_test, y_test, years_test, dup_mask)
+    save_table(by_year_export(per_year), "step6_by_year")
+    save_table(baseline, "step6_baseline_by_year")
+    save_table(drift, "step6_drift_summary")
+    save_table(per_year_nd.rename(columns={"model": "classifier"}), "step6_per_year_no_dup")
+    plot_by_year(per_year, RESULTS_DIR / "step6_by_year.png")
+    print("Step 6 (per test year; malware = positive class):")
+    print(by_year_export(per_year).round(4).to_string(index=False))
+    print(baseline.round(4).to_string(index=False))
+    print(drift.round(4).to_string(index=False))
+    return {"by_year": per_year, "baseline": baseline, "drift": drift, "no_dup": per_year_nd}
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Run the pipeline (Steps 1-5 exist so far); --step N runs one step."""
+    """Run the pipeline (Steps 1-6 exist so far); --step N runs one step."""
     parser = argparse.ArgumentParser(description="Project 2 pipeline")
     parser.add_argument("--step", type=int, choices=range(1, 8), help="run a single step (1-7)")
     args = parser.parse_args(argv)
-    if args.step not in (None, 1, 2, 3, 4, 5):
+    if args.step not in (None, 1, 2, 3, 4, 5, 6):
         print(f"Step {args.step} is not implemented yet.", file=sys.stderr)
         return 1  # non-zero so callers can tell nothing ran
     df = run_step1()
@@ -139,6 +176,8 @@ def main(argv: list[str] | None = None) -> int:
         models, _ = run_step4(split)
     if args.step in (None, 5):
         run_step5(df, split, models)
+    if args.step in (None, 6):
+        run_step6(df, split, models)
     return 0
 
 
