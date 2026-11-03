@@ -139,9 +139,23 @@ def prepare_split(
     pre = Preprocessor().fit(X_train_raw, features)  # training rows only
     X_train, X_test = pre.transform(X_train_raw, clip=False), pre.transform(X_test_raw, clip=False)
     clip_stats = clip_report(X_train, X_test)  # measured before clipping
+    clip_by_year = clip_by_year_report(X_train, a["years_train"], X_test, a["years_test"])  # also before clipping
     np.clip(X_train, -Z_CLIP, Z_CLIP, out=X_train)
     np.clip(X_test, -Z_CLIP, Z_CLIP, out=X_test)
-    return {"X_train": X_train, "X_test": X_test, "preprocessor": pre, "clip_stats": clip_stats, **a}
+    return {"X_train": X_train, "X_test": X_test, "preprocessor": pre, "clip_stats": clip_stats,
+            "clip_by_year": clip_by_year, **a}
+
+
+def clip_by_year_report(
+    X_train: np.ndarray, years_train: np.ndarray, X_test: np.ndarray, years_test: np.ndarray
+) -> pd.DataFrame:
+    """Per year (train and test): share of UNCLIPPED scaled entries beyond +-Z_CLIP and mean absolute z-score."""
+    rows = []
+    for side, X, years in (("train", X_train, years_train), ("test", X_test, years_test)):
+        for year in sorted(set(years.tolist())):
+            A = np.abs(X[years == year])
+            rows.append((side, int(year), int(A.shape[0]), float((A > Z_CLIP).mean()), float(A.mean(dtype=np.float64))))
+    return pd.DataFrame(rows, columns=["side", "year", "n", "clip_share", "mean_abs_z"])
 
 
 def clip_report(X_train: np.ndarray, X_test: np.ndarray) -> pd.DataFrame:

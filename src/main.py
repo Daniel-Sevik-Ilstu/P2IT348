@@ -12,6 +12,7 @@ from src.evaluate import (
     baseline_accuracy,
     by_year_export,
     confusion_table,
+    confusion_by_year,
     drift_summary,
     per_year_table,
     plot_by_year,
@@ -148,13 +149,23 @@ def run_step6(
     save_table(by_year_export(per_year), "step6_by_year")
     save_table(baseline, "step6_baseline_by_year")
     save_table(drift, "step6_drift_summary")
+    conf_year = confusion_by_year(models, X_test, y_test, years_test)
     save_table(per_year_nd.rename(columns={"model": "classifier"}), "step6_per_year_no_dup")
+    save_table(conf_year, "step6_confusion_by_year")
     plot_by_year(per_year, RESULTS_DIR / "step6_by_year.png")
     print("Step 6 (per test year; malware = positive class):")
     print(by_year_export(per_year).round(4).to_string(index=False))
     print(baseline.round(4).to_string(index=False))
     print(drift.round(4).to_string(index=False))
-    return {"by_year": per_year, "baseline": baseline, "drift": drift, "no_dup": per_year_nd}
+    print("Confusion counts and predicted-malware share by year:")
+    print(conf_year.round(4).to_string(index=False))
+    out = {"by_year": per_year, "baseline": baseline, "drift": drift, "no_dup": per_year_nd, "confusion_by_year": conf_year}
+    if "clip_by_year" in split:  # preprocessing extremes per year (measured before clipping in prepare_split)
+        save_table(split["clip_by_year"], "step6_clip_by_year")
+        print("Clip share and mean |z| by year (before clipping):")
+        print(split["clip_by_year"].round(4).to_string(index=False))
+        out["clip_by_year"] = split["clip_by_year"]
+    return out
 
 
 def main(argv: list[str] | None = None) -> int:

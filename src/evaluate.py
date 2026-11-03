@@ -93,6 +93,21 @@ def year_baseline_table(y_test: np.ndarray, years_test: np.ndarray) -> pd.DataFr
     return pd.DataFrame(rows)
 
 
+def confusion_by_year(
+    models: dict[str, Any], X_test: np.ndarray, y_test: np.ndarray, years_test: np.ndarray
+) -> pd.DataFrame:
+    """One row per (classifier, test year): tn, fp, fn, tp and the share of rows predicted as malware."""
+    assert_test_years_only(years_test)
+    rows = []
+    for name, m in models.items():
+        pred = m.predict(X_test)  # predict once, slice per year
+        for year in sorted(set(years_test.tolist())):
+            sel = years_test == year
+            rows.append({"classifier": name, "year": int(year), **confusion_counts(y_test[sel], pred[sel]),
+                         "predicted_malware_share": float(np.mean(pred[sel] == 1))})
+    return pd.DataFrame(rows)
+
+
 def by_year_export(per_year: pd.DataFrame) -> pd.DataFrame:
     """Step 6 file layout: columns classifier, year, n, accuracy, precision, recall, f1."""
     out = per_year.rename(columns={"model": "classifier"})
