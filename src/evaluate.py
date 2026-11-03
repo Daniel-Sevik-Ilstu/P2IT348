@@ -37,6 +37,12 @@ def assert_test_years_only(years: np.ndarray) -> None:
         raise ValueError(f"evaluation data contains years outside {TEST_YEARS}: {bad}")
 
 
+def _check_same_length(X_test: np.ndarray, y_test: np.ndarray) -> None:
+    """Raise ValueError if X_test and y_test have different numbers of rows."""
+    if len(X_test) != len(y_test):
+        raise ValueError(f"X_test has {len(X_test)} rows but y_test has {len(y_test)}")
+
+
 def evaluate_model(model: Any, X_test: np.ndarray, y_test: np.ndarray) -> dict[str, float]:
     """Predict with a fitted model and return its four metrics."""
     return compute_metrics(y_test, model.predict(X_test))
@@ -44,6 +50,7 @@ def evaluate_model(model: Any, X_test: np.ndarray, y_test: np.ndarray) -> dict[s
 
 def pooled_table(models: dict[str, Any], X_test: np.ndarray, y_test: np.ndarray) -> pd.DataFrame:
     """One row per classifier: model, accuracy, precision, recall, f1, n_test (pooled over the test years)."""
+    _check_same_length(X_test, y_test)
     rows = [{"model": name, **evaluate_model(m, X_test, y_test), "n_test": len(y_test)} for name, m in models.items()]
     return pd.DataFrame(rows, columns=["model", *METRIC_NAMES, "n_test"])
 
@@ -64,6 +71,7 @@ def per_year_table(
 
 def confusion_table(models: dict[str, Any], X_test: np.ndarray, y_test: np.ndarray) -> pd.DataFrame:
     """One row per classifier with pooled tn, fp, fn, tp counts."""
+    _check_same_length(X_test, y_test)
     return pd.DataFrame([{"model": n, **confusion_counts(y_test, m.predict(X_test))} for n, m in models.items()])
 
 
