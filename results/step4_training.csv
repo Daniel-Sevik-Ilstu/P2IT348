@@ -1,4 +1,4 @@
-model,train_seconds,train_accuracy,convergence_warnings
-logreg,1.87,0.9897,0
-random_forest,4.71,0.9969,0
-sgd,3.6,0.9884,0
+model,train_seconds,train_accuracy,convergence_warnings,warning_messages
+logreg,1.93,0.9897,0,
+random_forest,4.66,0.9969,0,
+sgd,3.69,0.9884,0,
