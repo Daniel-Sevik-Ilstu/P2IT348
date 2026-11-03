@@ -87,7 +87,7 @@ def train_all_from_split(split: dict) -> dict[str, Any]:
 def train_with_report(split: dict) -> tuple[dict[str, Any], pd.DataFrame]:
     """Train all models (with the shared guard) and return them plus a TRAINING-only sanity table.
 
-    Columns: model, train_seconds, train_accuracy, convergence_warnings. The accuracy is measured on the
+    Columns: model, train_seconds, train_accuracy, convergence_warnings, warning_messages (all recorded warnings). The accuracy is measured on the
     training rows themselves; it is a sanity check, not an evaluation.
     """
     _check_training_split(split)  # same guard as train_all_from_split
@@ -100,10 +100,20 @@ def train_with_report(split: dict) -> tuple[dict[str, Any], pd.DataFrame]:
             model = train_model(name, split["X_train"], split["y_train"])
             seconds = time.perf_counter() - start
         n_conv = sum(issubclass(w.category, ConvergenceWarning) for w in caught)
+        messages = []
+        for w in caught:
+            text = f"{w.category.__name__}: {w.message}"
+            if issubclass(w.category, ConvergenceWarning):
+                # Trace the hit: which model, how many iterations it used.
+                text = f"{name} (n_iter_={getattr(model, 'n_iter_', 'n/a')}) {text}"
+            messages.append(text)
+            # Re-emit so no recorded warning is lost; the pipeline is not stopped.
+            warnings.warn(text, w.category, stacklevel=2)
         acc = float((model.predict(split["X_train"]) == split["y_train"]).mean())
         models[name] = model
-        rows.append((name, round(seconds, 2), round(acc, 4), n_conv))
-    return models, pd.DataFrame(rows, columns=["model", "train_seconds", "train_accuracy", "convergence_warnings"])
+        rows.append((name, round(seconds, 2), round(acc, 4), n_conv, " | ".join(messages)))
+    columns = ["model", "train_seconds", "train_accuracy", "convergence_warnings", "warning_messages"]
+    return models, pd.DataFrame(rows, columns=columns)
 
 
 def save_models(models: dict[str, Any], model_dir=MODEL_DIR) -> None:
