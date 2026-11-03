@@ -161,7 +161,7 @@ Source: `reviews/step0_plan_review.md` (Decision log). Comment 10 was Rejected a
 - `assert_test_years_only(years: np.ndarray) -> None`: raises if any year is outside `TEST_YEARS`.
 - `sensitivity_tables(models: dict, X_test, y_test, years_test, dup_mask: np.ndarray) -> tuple[pd.DataFrame, pd.DataFrame]`: the same pooled and per-year tables restricted to test rows where `dup_mask` is False (no exact duplicate in 2014-2016), with a `n_excluded` column; `dup_mask` comes from `train_duplicate_mask` (Step 1). Saved as `results/step5_pooled_no_dup.*` and `results/step6_per_year_no_dup.*`.
 - `save_table(df: pd.DataFrame, stem: str) -> None`: writes `results/<stem>.csv` and `results/<stem>.md` (Markdown table with fixed rounding to 4 decimals).
-- `run_evaluation(df) -> dict[str, pd.DataFrame]`: runs Steps 3-4 pipeline, writes `results/step5_pooled_metrics.*`, `results/step6_per_year_metrics.*`, optional `results/step6_f1_by_year.png`.
+- `run_evaluation(df) -> dict[str, pd.DataFrame]`: runs Steps 3-4 pipeline, writes `results/step5_metrics.*` and `results/step5_confusion.*`, `results/step6_per_year_metrics.*`, optional `results/step6_f1_by_year.png`.
 
 **Notes.** Pooled metrics weight years by size (2017-2018 are 6x larger than 2019-2021), so the per-year table is the primary view; the report says so.
 
