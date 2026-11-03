@@ -41,6 +41,11 @@ def split_by_year(
     check_no_overlap(train_years, test_years)  # guard first: nothing is selected for a bad split
     train = df[df[YEAR_COL].isin(train_years)]
     test = df[df[YEAR_COL].isin(test_years)]
+    # Every requested year must be present, otherwise the split is silently smaller than asked for.
+    for name, part, years in (("train", train, train_years), ("test", test, test_years)):
+        missing = sorted(set(years) - set(part[YEAR_COL].unique()))
+        if missing:
+            raise ValueError(f"requested {name} years missing from the data: {missing}")
     return train, test
 
 
