@@ -29,6 +29,7 @@ One row per failing test. Decision is "Accepted" (the test is right; the builder
 
 | Test | Cause | Decision | Fixed in commit |
 | --- | --- | --- | --- |
+| test_step6_only_predicts_with_given_models | The test stub asserted that predict always sees all 600 test rows, but run_step6 also predicts on the smaller no-duplicate subset (552 rows), so it failed with 552 == 600. The code is right and the test setup was wrong; the tester fixed the stub and Run 2 passed. | Rejected | dc006ad |
 
 ## Runs (added by `python harness.py test N`; do not edit)
 
