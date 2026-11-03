@@ -294,3 +294,134 @@ PASSED tests/test_step6_per_year.py::test_missing_test_year_is_not_invented
 PASSED tests/test_step6_per_year.py::test_real_data_each_test_year_has_expected_rows
 ======================= 14 passed, 1 warning in 18.46s ========================
 ```
+
+### Run 3: PASSED
+
+- Time: 2026-11-03T05:57:04+02:00
+- Commit: 6d6f625
+- Result: 14 passed, 1 warning in 9.34s
+- Files: test_step6_per_year.py
+
+```
+... (411 earlier lines omitted)
+       logreg  2021 120    0.9833     0.9630  1.0000 0.9811
+random_forest  2017 120    0.9833     0.9677  1.0000 0.9836
+random_forest  2018 120    0.9833     0.9677  1.0000 0.9836
+random_forest  2019 120    1.0000     1.0000  1.0000 1.0000
+random_forest  2020 120    0.9833     0.9828  0.9828 0.9828
+random_forest  2021 120    0.9833     0.9808  0.9808 0.9808
+          sgd  2017 120    0.9917     1.0000  0.9833 0.9916
+          sgd  2018 120    1.0000     1.0000  1.0000 1.0000
+          sgd  2019 120    1.0000     1.0000  1.0000 1.0000
+          sgd  2020 120    0.9833     0.9667  1.0000 0.9831
+          sgd  2021 120    0.9833     0.9630  1.0000 0.9811
+ year   n  n_malware  n_benign  malware_share  baseline_accuracy
+ 2017 120         60        60         0.5000             0.5000
+ 2018 120         60        60         0.5000             0.5000
+ 2019 120         55        65         0.4583             0.5417
+ 2020 120         58        62         0.4833             0.5167
+ 2021 120         52        68         0.4333             0.5667
+        model  first_year  last_year  f1_first  f1_last  f1_drop  f1_slope_per_year
+       logreg        2017       2021    0.9916   0.9811   0.0105            -0.0038
+random_forest        2017       2021    0.9836   0.9808   0.0028            -0.0007
+          sgd        2017       2021    0.9916   0.9811   0.0105            -0.0038
+Confusion counts and predicted-malware share by year:
+   classifier  year  tn  fp  fn  tp  predicted_malware_share
+       logreg  2017  60   0   1  59                   0.4917
+       logreg  2018  60   0   0  60                   0.5000
+       logreg  2019  65   0   0  55                   0.4583
+       logreg  2020  60   2   0  58                   0.5000
+       logreg  2021  66   2   0  52                   0.4500
+random_forest  2017  58   2   0  60                   0.5167
+random_forest  2018  58   2   0  60                   0.5167
+random_forest  2019  65   0   0  55                   0.4583
+random_forest  2020  61   1   1  57                   0.4833
+random_forest  2021  67   1   1  51                   0.4333
+          sgd  2017  60   0   1  59                   0.4917
+          sgd  2018  60   0   0  60                   0.5000
+          sgd  2019  65   0   0  55                   0.4583
+          sgd  2020  60   2   0  58                   0.5000
+          sgd  2021  66   2   0  52                   0.4500
+Clip share and mean |z| by year (before clipping):
+ side  year   n  clip_share  mean_abs_z
+train  2014 120         0.0      0.8534
+train  2015 120         0.0      0.8484
+train  2016 120         0.0      0.8373
+ test  2017 120         0.0      0.8685
+ test  2018 120         0.0      0.8521
+ test  2019 120         0.0      0.8009
+ test  2020 120         0.0      0.8540
+ test  2021 120         0.0      0.8310
+_________________ test_single_class_test_year_does_not_crash __________________
+---------------------------- Captured stdout call -----------------------------
+Step 6 (per test year; malware = positive class):
+   classifier  year   n  accuracy  precision  recall     f1
+       logreg  2017 120    0.9917     1.0000  0.9833 0.9916
+       logreg  2018 120    1.0000     1.0000  1.0000 1.0000
+       logreg  2019 120    0.4583     1.0000  0.4583 0.6286
+       logreg  2020 120    0.9833     0.9667  1.0000 0.9831
+       logreg  2021 120    0.5500     0.0000  0.0000 0.0000
+random_forest  2017 120    0.9833     0.9677  1.0000 0.9836
+random_forest  2018 120    0.9833     0.9677  1.0000 0.9836
+random_forest  2019 120    0.4583     1.0000  0.4583 0.6286
+random_forest  2020 120    0.9833     0.9828  0.9828 0.9828
+random_forest  2021 120    0.5667     0.0000  0.0000 0.0000
+          sgd  2017 120    0.9917     1.0000  0.9833 0.9916
+          sgd  2018 120    1.0000     1.0000  1.0000 1.0000
+          sgd  2019 120    0.4583     1.0000  0.4583 0.6286
+          sgd  2020 120    0.9833     0.9667  1.0000 0.9831
+          sgd  2021 120    0.5500     0.0000  0.0000 0.0000
+ year   n  n_malware  n_benign  malware_share  baseline_accuracy
+ 2017 120         60        60         0.5000             0.5000
+ 2018 120         60        60         0.5000             0.5000
+ 2019 120        120         0         1.0000             1.0000
+ 2020 120         58        62         0.4833             0.5167
+ 2021 120          0       120         0.0000             1.0000
+        model  first_year  last_year  f1_first  f1_last  f1_drop  f1_slope_per_year
+       logreg        2017       2021    0.9916      0.0   0.9916            -0.2000
+random_forest        2017       2021    0.9836      0.0   0.9836            -0.1968
+          sgd        2017       2021    0.9916      0.0   0.9916            -0.2000
+Confusion counts and predicted-malware share by year:
+   classifier  year  tn  fp  fn  tp  predicted_malware_share
+       logreg  2017  60   0   1  59                   0.4917
+       logreg  2018  60   0   0  60                   0.5000
+       logreg  2019   0   0  65  55                   0.4583
+       logreg  2020  60   2   0  58                   0.5000
+       logreg  2021  66  54   0   0                   0.4500
+random_forest  2017  58   2   0  60                   0.5167
+random_forest  2018  58   2   0  60                   0.5167
+random_forest  2019   0   0  65  55                   0.4583
+random_forest  2020  61   1   1  57                   0.4833
+random_forest  2021  68  52   0   0                   0.4333
+          sgd  2017  60   0   1  59                   0.4917
+          sgd  2018  60   0   0  60                   0.5000
+          sgd  2019   0   0  65  55                   0.4583
+          sgd  2020  60   2   0  58                   0.5000
+          sgd  2021  66  54   0   0                   0.4500
+Clip share and mean |z| by year (before clipping):
+ side  year   n  clip_share  mean_abs_z
+train  2014 120         0.0      0.8534
+train  2015 120         0.0      0.8484
+train  2016 120         0.0      0.8373
+ test  2017 120         0.0      0.8685
+ test  2018 120         0.0      0.8521
+ test  2019 120         0.0      0.8009
+ test  2020 120         0.0      0.8540
+ test  2021 120         0.0      0.8310
+=========================== short test summary info ===========================
+PASSED tests/test_step6_per_year.py::test_one_row_per_test_year_per_classifier
+PASSED tests/test_step6_per_year.py::test_all_metric_values_between_0_and_1
+PASSED tests/test_step6_per_year.py::test_per_year_n_sums_to_total_test_rows
+PASSED tests/test_step6_per_year.py::test_no_training_year_in_per_year_table
+PASSED tests/test_step6_per_year.py::test_step6_writes_expected_files
+PASSED tests/test_step6_per_year.py::test_step6_only_predicts_with_given_models
+PASSED tests/test_step6_per_year.py::test_step6_does_not_refit_passed_models
+PASSED tests/test_step6_per_year.py::test_per_year_metrics_hand_checked_two_years
+PASSED tests/test_step6_per_year.py::test_per_year_metrics_match_sklearn
+PASSED tests/test_step6_per_year.py::test_run_step6_matches_sklearn_on_same_rows
+PASSED tests/test_step6_per_year.py::test_year_outside_test_range_is_rejected
+PASSED tests/test_step6_per_year.py::test_single_class_test_year_does_not_crash
+PASSED tests/test_step6_per_year.py::test_missing_test_year_is_not_invented
+PASSED tests/test_step6_per_year.py::test_real_data_each_test_year_has_expected_rows
+======================== 14 passed, 1 warning in 9.34s ========================
+```
