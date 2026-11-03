@@ -30,17 +30,17 @@ Measured on this laptop. The accuracy is on the **training** rows, so it is only
 
 | Model | Training time (s) | Training accuracy (not evaluation) | ConvergenceWarnings |
 |---|---|---|---|
-| logreg | 1.87 | 0.9897 | 0 |
-| random_forest | 4.71 | 0.9969 | 0 |
-| sgd | 3.60 | 0.9884 | 0 |
+| logreg | 1.93 | 0.9897 | 0 |
+| random_forest | 4.66 | 0.9969 | 0 |
+| sgd | 3.69 | 0.9884 | 0 |
 
-Total training time is about 10 seconds, well inside the 15-minute budget. `max_iter=1000` was enough for lbfgs to converge, so no solver change was needed and no warnings had to be hidden; the training code records warnings (it does not suppress them), and the count is 0 for all three models.
+Total training time is about 10 seconds, well inside the 15-minute budget. `max_iter=1000` was enough for lbfgs to converge, so no solver change was needed and no warnings had to be hidden; the training code records warnings (it does not suppress them), and the count is 0 for all three models. Any recorded warning is now re-emitted and its text stored in the `warning_messages` column of `results/step4_training.csv` (empty for all three models); a convergence hit is logged with the model name and `n_iter_`. A non-zero count is reported, not fatal (review #3).
 
 The training accuracies are high and very similar, and the random forest is the highest because deep trees fit the training data closely. This is expected and is not evidence about the test years; many training rows are duplicates (see Step 1), which also makes training accuracy optimistic.
 
 ## Implementation notes
 
-- Functions in `src/models.py`: `build_model(name)`, `train_model(name, X, y)`, `train_all(X, y)`, `train_all_from_split(split)`, `MODEL_NAMES`, plus `train_with_report(split)` (trains with the same year guard and returns the timing table) and `save_models`.
-- `train_all_from_split` and `train_with_report` raise `ValueError` if `split["years_train"]` contains a year outside 2014-2016.
+- Functions in `src/models.py`: `build_model(name)`, `train_model(name, X, y)`, `train_all(X, y)`, `train_all_from_split(split)`, `MODEL_NAMES`, plus `train_with_report(split)` (trains with the shared guard and returns the timing table) and `save_models`.
+- `train_all_from_split` and `train_with_report` both call one helper, `_check_training_split`. It raises `ValueError` if `years_train` is empty, its length differs from `X_train`/`y_train`, it contains a year outside 2014-2016, it fails `check_no_overlap` against the test years, or `y_train` is not exactly the classes {0, 1} (review #1, #2). `train_model` also checks the arrays (non-empty, equal length, both classes).
 - Fitted models are saved to `cache/models/*.joblib` (`cache/` is git-ignored). I did not use them elsewhere in this step.
 - Not done: hyperparameter tuning, and no evaluation on 2017-2021 (Steps 5-6).
