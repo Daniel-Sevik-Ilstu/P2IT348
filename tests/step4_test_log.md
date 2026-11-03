@@ -42,6 +42,8 @@ One row per failing test. Decision is "Accepted" (the test is right; the builder
 
 | Test | Cause | Decision | Fixed in commit |
 | --- | --- | --- | --- |
+| test_one_class_y_train_raises[random_forest] | A one-class y_train is accepted by RandomForest and gives a degenerate model without any error. The test is right. Same defect as review comment 1 (accepted). | Accepted | |
+| test_train_all_from_split_mismatched_years_length_raises | years_train shorter than X and y passes the guard because only the metadata set is checked. The test is right. Same defect as review comment 1. | Accepted | |
 
 ## Runs (added by `python harness.py test N`; do not edit)
 
