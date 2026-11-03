@@ -14,11 +14,12 @@ The Step 3 output: 54,000 rows (2014, 2015, 2016 at 18,000 each, 9,000 malware a
 | `random_forest`: RandomForestClassifier | `n_estimators=200`, `n_jobs=-1`, other settings default (unbounded depth, `max_features="sqrt"`) | 42 | Non-linear ensemble that can capture interactions between API calls and thresholds on counts; insensitive to feature scale. |
 | `sgd`: SGDClassifier | `loss="log_loss"`, `penalty="l2"`, `alpha=1e-4`, `max_iter=1000`, `tol=1e-3`, no class weight | 42 | Logistic model trained by stochastic gradient descent; the only one of the three with `partial_fit`, so it is the incremental model for Step 7. |
 
-No hyperparameter tuning was run (the optional `tune_logreg` in PLAN.md was not implemented); every value is the default or the PLAN.md choice.
+No hyperparameter tuning was done. `C=1.0`, `alpha=1e-4` and `n_estimators=200` are defaults or PLAN.md choices, not tuned on the 2016 validation year. The optional grid search (`tune_logreg`) is marked "only if time allows" in PLAN.md and was skipped (review #5).
 
 ## Class balance
 
 - Training years are balanced (50% malware per year), so class imbalance is not an issue in this step.
+- Effectively, all three models are unweighted: the training years are exactly 27,000 malware and 27,000 goodware, so even logreg's `class_weight="balanced"` gives both classes weight 1.0 (review #4).
 - `logreg` still uses `class_weight="balanced"`. With balanced data the weights are 1.0 for both classes, so this has no effect now; it only protects against imbalance in later use.
 - `sgd` uses no class weight on purpose: scikit-learn raises `ValueError` for `class_weight="balanced"` in `partial_fit`. I confirmed that `build_model("sgd")` can be fit and then `partial_fit` without error.
 - `random_forest` uses no class weight.
