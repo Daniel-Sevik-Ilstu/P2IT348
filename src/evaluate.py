@@ -1,6 +1,7 @@
 """Steps 5 and 6: evaluate the trained classifiers on the held-out test years (malware = positive class)."""
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -67,6 +68,59 @@ def per_year_table(
             sel = years_test == year
             rows.append({"model": name, "year": int(year), **compute_metrics(y_test[sel], pred[sel]), "n": int(sel.sum())})
     return pd.DataFrame(rows, columns=["model", "year", *METRIC_NAMES, "n"])
+
+
+def drift_summary(per_year: pd.DataFrame) -> pd.DataFrame:
+    """Per model: F1 in the first and last test year, the drop between them, and the least-squares F1 slope per year."""
+    rows = []
+    for name, g in per_year.groupby("model", sort=False):
+        g = g.sort_values("year")
+        first, last = float(g["f1"].iloc[0]), float(g["f1"].iloc[-1])
+        slope = float(np.polyfit(g["year"].to_numpy(dtype=float), g["f1"].to_numpy(dtype=float), 1)[0]) if len(g) > 1 else 0.0
+        rows.append({"model": name, "first_year": int(g["year"].iloc[0]), "last_year": int(g["year"].iloc[-1]),
+                     "f1_first": first, "f1_last": last, "f1_drop": first - last, "f1_slope_per_year": slope})
+    return pd.DataFrame(rows)
+
+
+def year_baseline_table(y_test: np.ndarray, years_test: np.ndarray) -> pd.DataFrame:
+    """Per test year: n, malware/benign counts, malware share and majority-class (baseline) accuracy."""
+    assert_test_years_only(years_test)
+    rows = []
+    for year in sorted(set(years_test.tolist())):
+        y = y_test[years_test == year]
+        rows.append({"year": int(year), "n": len(y), "n_malware": int((y == 1).sum()), "n_benign": int((y == 0).sum()),
+                     "malware_share": float(np.mean(y == 1)), "baseline_accuracy": baseline_accuracy(y)})
+    return pd.DataFrame(rows)
+
+
+def by_year_export(per_year: pd.DataFrame) -> pd.DataFrame:
+    """Step 6 file layout: columns classifier, year, n, accuracy, precision, recall, f1."""
+    out = per_year.rename(columns={"model": "classifier"})
+    return out[["classifier", "year", "n", *METRIC_NAMES]]
+
+
+def plot_by_year(per_year: pd.DataFrame, path: Path) -> None:
+    """Save a two-panel figure (F1 and accuracy by test year, one line per classifier) to path."""
+    import matplotlib
+
+    matplotlib.use("Agg")  # no display needed
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4), sharex=True)
+    for ax, metric in zip(axes, ("f1", "accuracy")):
+        for name, g in per_year.groupby("model", sort=False):
+            g = g.sort_values("year")
+            ax.plot(g["year"], g[metric], marker="o", label=name)
+        ax.set_title(f"{metric.upper() if metric == 'f1' else metric.capitalize()} by test year")
+        ax.set_xlabel("test year")
+        ax.set_xticks(sorted(per_year["year"].unique()))
+        ax.grid(alpha=0.3)
+    axes[0].set_ylabel("score (malware = positive class)")
+    axes[0].legend()
+    fig.tight_layout()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
 
 
 def confusion_table(models: dict[str, Any], X_test: np.ndarray, y_test: np.ndarray) -> pd.DataFrame:
