@@ -66,7 +66,10 @@ def nonzero_feature_mask(X_train: np.ndarray, min_support: int = MIN_SUPPORT) ->
 
 
 class Preprocessor:
-    """log1p -> minimum-support column filter -> StandardScaler, all learned from training rows only."""
+    """log1p -> minimum-support column filter -> StandardScaler -> fixed clip, all learned from training rows only.
+
+    sklearn-like (fit/transform/fit_transform), not a BaseEstimator: no get_params, not usable in a Pipeline.
+    """
 
     def __init__(self, min_support: int = MIN_SUPPORT) -> None:
         """Store the support threshold; nothing is learned until `fit`."""
