@@ -156,6 +156,9 @@ def run_step6(
     per_year = per_year_table(models, X_test, y_test, years_test)
     baseline = year_baseline_table(y_test, years_test)
     drift = drift_summary(per_year)
+    # Guard: every test year for every classifier, i.e. 3 models x 5 years = 15 rows.
+    if set(per_year["year"]) != set(TEST_YEARS) or len(per_year) != len(models) * len(TEST_YEARS):
+        raise ValueError(f"per-year table has {len(per_year)} rows; expected {len(models)} models x {len(TEST_YEARS)} test years")
     # Sensitivity: only test rows with no exact duplicate in 2014-2016.
     dup_mask = test_duplicate_mask(df, split)
     _, per_year_nd = sensitivity_tables(models, X_test, y_test, years_test, dup_mask)
