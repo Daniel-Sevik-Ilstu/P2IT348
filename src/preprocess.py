@@ -60,6 +60,8 @@ def apply_log1p(X: np.ndarray) -> np.ndarray:
 
 def nonzero_feature_mask(X_train: np.ndarray, min_support: int = MIN_SUPPORT) -> np.ndarray:
     """Boolean mask of columns with at least `min_support` non-zero values in the TRAINING rows."""
+    if min_support < 1:
+        raise ValueError(f"min_support must be >= 1, got {min_support}")
     return (X_train != 0).sum(axis=0) >= min_support
 
 
@@ -68,6 +70,8 @@ class Preprocessor:
 
     def __init__(self, min_support: int = MIN_SUPPORT) -> None:
         """Store the support threshold; nothing is learned until `fit`."""
+        if min_support < 1:
+            raise ValueError(f"min_support must be >= 1, got {min_support}")
         self.min_support = min_support
         self.scaler: StandardScaler | None = None
         self.mask_: np.ndarray | None = None
