@@ -7,7 +7,7 @@ Written by the builder agent. All numbers below were produced by `python -m src.
 - Each trained classifier (logreg, random forest, SGD; fit on 2014-2016 only in Step 4) predicts each test year 2017-2021 separately. The models and the preprocessor are not refit or tuned on any test year; test rows only go through `transform` and `predict`. `assert_test_years_only` raises if any other year is passed.
 - Code: `per_year_table` (already in `src/evaluate.py`) plus new `drift_summary`, `year_baseline_table`, `by_year_export` and `plot_by_year`; entry point `main.run_step6` (`--step 6`). `PLAN.md` was updated in its own commit for the new file names.
 - Malware (label 1) is the positive class. Every test year is exactly 50% malware and 50% goodware (table below), so the majority-class baseline accuracy is 0.5000 in every year.
-- Files: `results/step6_by_year.csv|md` (columns `classifier, year, n, accuracy, precision, recall, f1`), `results/step6_baseline_by_year.csv|md`, `results/step6_drift_summary.csv|md`, `results/step6_per_year_no_dup.csv|md`, `results/step6_by_year.png`.
+- Files: `results/step6_by_year.csv|md` (columns `classifier, year, n, accuracy, precision, recall, f1`), `results/step6_baseline_by_year.csv|md`, `results/step6_drift_summary.csv|md`, `results/step6_per_year_no_dup.csv|md`, `results/step6_confusion_by_year.csv|md`, `results/step6_clip_by_year.csv|md`, `results/step6_by_year.png` (the accuracy panel has a dashed line at the 0.5 chance level).
 
 ## Results by test year
 
@@ -47,6 +47,43 @@ Check against Step 5: weighting the per-year accuracies by n gives the pooled ac
 
 **What the models do in 2019-2021.** Recall stays very high (0.980-1.000) while precision falls to 0.502-0.526. This is the pattern of a classifier that labels almost everything as malware. For example, for logreg in 2021, precision 0.5063 with recall 0.9920 (1,488 of 1,500 malware caught) implies about 1,451 of the 1,500 goodware apps flagged (derived from the two numbers, about 97%). An F1 of about 0.667 is exactly the F1 of a model that always predicts malware on a balanced set (2*0.5/(0.5+1)); the 2019-2021 F1 values (0.6668-0.6875) are only 0.0001-0.0208 above that. So the F1 of 0.67 should not be read as "moderate" performance: accuracy shows these years are close to chance. The classes are balanced in every year, so the low precision comes from many false positives, not from the class mix.
 
+**Confusion counts and predicted-malware share by year** (`results/step6_confusion_by_year.csv|md`; every year has 50% malware, so a share of 0.50 would be neutral):
+
+| Classifier | Year | TN | FP | FN | TP | Predicted malware share |
+|---|---|---|---|---|---|---|
+| logreg | 2017 | 8949 | 51 | 788 | 8212 | 0.4591 |
+| logreg | 2018 | 8754 | 246 | 886 | 8114 | 0.4644 |
+| logreg | 2019 | 142 | 1358 | 29 | 1471 | 0.9430 |
+| logreg | 2020 | 33 | 1467 | 14 | 1486 | 0.9843 |
+| logreg | 2021 | 49 | 1451 | 12 | 1488 | 0.9797 |
+| random_forest | 2017 | 8976 | 24 | 703 | 8297 | 0.4623 |
+| random_forest | 2018 | 8760 | 240 | 791 | 8209 | 0.4694 |
+| random_forest | 2019 | 159 | 1341 | 12 | 1488 | 0.9430 |
+| random_forest | 2020 | 49 | 1451 | 7 | 1493 | 0.9813 |
+| random_forest | 2021 | 39 | 1461 | 8 | 1492 | 0.9843 |
+| sgd | 2017 | 8930 | 70 | 1520 | 7480 | 0.4194 |
+| sgd | 2018 | 8623 | 377 | 1047 | 7953 | 0.4628 |
+| sgd | 2019 | 126 | 1374 | 30 | 1470 | 0.9480 |
+| sgd | 2020 | 23 | 1477 | 11 | 1489 | 0.9887 |
+| sgd | 2021 | 19 | 1481 | 0 | 1500 | 0.9937 |
+
+This replaces the earlier estimate derived from precision and recall with exact counts: in 2019-2021 the classifiers call 94.3-99.4% of all apps malware and correctly identify only 1.3-10.6% of goodware (specificity, TN / 1500: random forest 2019 159/1500 = 10.6%, SGD 2021 19/1500 = 1.3%). In 2017-2018 the models do the opposite and slightly under-predict malware (share 0.42-0.47, 703 to 1,520 missed malware per year, but almost all goodware recognised). The failure at 2019 is therefore a sharp shift of the predicted class, not a graded loss of accuracy. F1 of about 0.67 is the always-malware F1 on a balanced set and should not be read as moderate performance.
+
+**Preprocessing extremes versus real drift.** To check whether the 2019-2021 collapse is an artefact of the preprocessing (log1p, standard scaling fitted on 2014-2016, clip at +-Z_CLIP), the code now measures, per year and before clipping, the share of scaled entries beyond the clip and the mean absolute z-score (`results/step6_clip_by_year.csv|md`; the training years are included for reference):
+
+| Side | Year | n | Clip share | Mean abs z |
+|---|---|---|---|---|
+| train | 2014 | 18000 | 0.0008 | 0.3390 |
+| train | 2015 | 18000 | 0.0010 | 0.3487 |
+| train | 2016 | 18000 | 0.0015 | 0.4042 |
+| test | 2017 | 18000 | 0.0018 | 0.3848 |
+| test | 2018 | 18000 | 0.0030 | 0.4382 |
+| test | 2019 | 3000 | 0.0051 | 0.5190 |
+| test | 2020 | 3000 | 0.0071 | 0.6119 |
+| test | 2021 | 3000 | 0.0106 | 0.8050 |
+
+What this shows: (1) The clipped share is small in every year (at most 1.06% of entries, in 2021), so clipping touches few values and cannot by itself turn a 0.46 predicted-malware share into 0.94. (2) The extremes grow steadily from year to year, with no jump at 2019: clip share 0.0018, 0.0030, 0.0051, 0.0071, 0.0106 and mean absolute z 0.385, 0.438, 0.519, 0.612, 0.805. The 2018 to 2019 change in these numbers (0.0021 clip share, 0.081 mean abs z) is smaller than the 2021 against 2020 change (0.0035, 0.193), yet performance collapses between 2018 and 2019 and does not change between 2020 and 2021. So the size of the extremes does not follow the shape of the cliff. (3) The mean absolute z-score rises by more than a factor of two from 2014 (0.339) to 2021 (0.805): later data sit further from the 2014-2016 feature means and variances, which is feature drift measured in the training scale, consistent with the rising Step 2 KS values. The earlier years do not show the same effect. Conclusion: the evidence points to real distribution drift (the 2019-2021 files differ from 2014-2018 on many features), not to a preprocessing artefact from a few extreme values. I did not test it directly (for example by changing the clip value or the scaler), so I cannot say whether a different preprocessing would reduce the shift in predicted class; and these numbers cannot separate real change in app behaviour from a change in how the 2019-2021 files were collected (they are also much smaller, 1,500 rows per file against 9,000).
+
 **Per-year drift summary** (`results/step6_drift_summary.csv`, first test year 2017 vs last 2021):
 
 | Classifier | F1 2017 | F1 2021 | F1 drop | F1 slope per year |
@@ -74,7 +111,7 @@ The Step 2 accuracy matrix (`results/step2_accuracy_matrix.csv`, 3,000 balanced 
 
 ## Sensitivity: test rows with no exact duplicate in 2014-2016
 
-Files: `results/step6_per_year_no_dup.csv|md`. Rows whose exact feature vector also occurs in 2014-2016 are removed (5,972 of 18,000 in 2017, 1,645 in 2018, 57 in 2019, 67 in 2020, 2 in 2021). Unlike the full table, this subset is not exactly balanced, so the baseline above does not apply to it. Accuracy / F1:
+Files: `results/step6_per_year_no_dup.csv|md`. Rows whose exact feature vector also occurs in 2014-2016 are removed (5,972 of 18,000 in 2017, 1,645 in 2018, 57 in 2019, 67 in 2020, 2 in 2021). Unlike the full table, this subset is not exactly balanced, so the baseline above does not apply to it; the table now has `n_malware`, `n_benign` and `baseline_accuracy` per year. Baseline accuracy of the kept rows: 2017 0.6630 (4,053 malware / 7,975 goodware), 2018 0.5203, 2019 0.5025, 2020 0.5094, 2021 0.5003. Accuracy / F1:
 
 | Classifier | 2017 | 2018 | 2019 | 2020 | 2021 |
 |---|---|---|---|---|---|
@@ -82,7 +119,7 @@ Files: `results/step6_per_year_no_dup.csv|md`. Rows whose exact feature vector a
 | random_forest | 0.9683 / 0.9510 | 0.9526 / 0.9496 | 0.5420 / 0.6831 | 0.5049 / 0.6642 | 0.5100 / 0.6698 |
 | sgd | 0.9644 / 0.9452 | 0.9448 / 0.9419 | 0.5267 / 0.6742 | 0.4957 / 0.6599 | 0.5060 / 0.6692 |
 
-The 2017 filter changes F1 by -0.012 (logreg), -0.007 (random forest) and +0.041 (SGD) and raises accuracy for all three (so the duplicates do not explain the good 2017 result), and 2019-2021 barely change because almost no rows are removed. The cliff at 2019 is present in this subset as well. I did not compute a baseline per subset for this table; the 2017 and 2018 subsets are no longer balanced, so precision and accuracy there are not comparable to the full-year numbers.
+The 2017 filter changes F1 by -0.012 (logreg), -0.007 (random forest) and +0.041 (SGD) and raises accuracy for all three, but the 2017 subset is 66% goodware (baseline 0.6630), so the gain over the baseline is 0.30 rather than 0.46 and accuracy there is not comparable to the full-year number. The duplicates therefore do not explain the good 2017 result (F1 stays 0.94-0.95). 2019-2021 barely change because almost no rows are removed, and the cliff at 2019 is present in this subset as well (accuracy 0.4957-0.5420 against baselines of 0.5003-0.5094).
 
 ## Caveats
 
