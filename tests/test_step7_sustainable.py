@@ -557,3 +557,11 @@ def test_cost_table_incremental_update_rows_separate(all_results):
     inc = cost.loc[("incremental", "sgd")]
     assert inc["mean_train_rows"] == 900 and inc["update_rows"] == 300
     assert cost.drop(index=("incremental", "sgd"))["update_rows"].isna().all()
+
+
+def test_pred_malware_rate_and_year_diagnostic(all_results, drift_df):
+    """Review comment 2: predicted-malware rate equals (tp + fp) / n; the 2018-vs-2019 diagnostic has one row per year."""
+    assert np.allclose(all_results["pred_malware_rate"], (all_results["tp"] + all_results["fp"]) / all_results["n"])
+    diag = sustainable.year_diagnostic(drift_df)
+    assert {2018, 2019} <= set(diag["year"])
+    assert ((diag["mean_nonzero_rate"] >= 0) & (diag["clip_share"] >= 0) & (diag["clip_share"] <= 1)).all()

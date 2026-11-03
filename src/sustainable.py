@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 from sklearn.exceptions import ConvergenceWarning
 
-from src.config import LABEL_COL, RESULTS_DIR, TEST_YEARS, TRAIN_YEARS, YEAR_COL
+from src.config import LABEL_COL, RESULTS_DIR, TEST_YEARS, TRAIN_YEARS, YEAR_COL, Z_CLIP
 from src.data import feature_columns
 from src.evaluate import compute_metrics, confusion_counts, save_table
 from src.models import train_model
@@ -97,6 +97,7 @@ def _result_row(
     """One result row: metrics, confusion counts, cost and the training window for one (strategy, classifier, year)."""
     return {"strategy": strategy, "classifier": classifier, "year": t, "n": len(y_true),
             **compute_metrics(y_true, y_pred), **confusion_counts(y_true, y_pred),
+            "pred_malware_rate": float(np.mean(np.asarray(y_pred) == 1)),  # share of apps flagged malware
             "train_seconds": seconds, "train_rows": train_rows, "window": f"{min(years)}-{max(years)}",
             "convergence_warnings": n_conv}
 
@@ -218,7 +219,7 @@ def pooled_by_strategy(results: pd.DataFrame) -> pd.DataFrame:
         rec = tp / (tp + fn) if tp + fn else 0.0
         f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0
         rows.append({"strategy": strategy, "classifier": clf, "n": n, "accuracy": (tp + tn) / n,
-                     "precision": prec, "recall": rec, "f1": f1})
+                     "precision": prec, "recall": rec, "f1": f1, "pred_malware_rate": (tp + fp) / n})
     return pd.DataFrame(rows)
 
 
@@ -242,7 +243,8 @@ def summary_table(results: pd.DataFrame) -> pd.DataFrame:
         late = g[g["year"] >= 2019]
         rows.append({"strategy": strategy, "classifier": clf, "mean_f1": g["f1"].mean(), "worst_f1": worst["f1"],
                      "worst_year": int(worst["year"]), "mean_f1_2019_21": late["f1"].mean(),
-                     "mean_accuracy_2019_21": late["accuracy"].mean(), "mean_accuracy": g["accuracy"].mean()})
+                     "mean_accuracy_2019_21": late["accuracy"].mean(), "mean_accuracy": g["accuracy"].mean(),
+                     "pred_malware_rate_2019": float(late.loc[late["year"] == 2019, "pred_malware_rate"].iloc[0])})
     out = pd.DataFrame(rows)
     base = out[out["strategy"] == "static"].set_index("classifier")
     out["mean_f1_gain_vs_static"] = out["mean_f1"] - out["classifier"].map(base["mean_f1"])
@@ -295,6 +297,27 @@ def window_composition(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def year_diagnostic(df: pd.DataFrame, years: tuple[int, ...] = (2016, 2017, 2018, 2019, 2020, 2021)) -> pd.DataFrame:
+    """Does 2019 differ in kind from 2018? Feature statistics per year under the 2014-2016 preprocessor.
+
+    Columns: mean_nonzero_rate (mean over kept features of the share of rows with a non-zero count),
+    mean_nonzero_features (average number of non-zero kept features per app), clip_share (share of UNCLIPPED
+    scaled entries with |z| > Z_CLIP, i.e. entries the clip would cut) and mean_abs_z. Descriptive only.
+    """
+    check_years_present(df)
+    arrays = year_arrays(df)
+    pre = Preprocessor().fit(_stack(arrays, tuple(TRAIN_YEARS))[0], feature_columns(df))
+    rows = []
+    for year in years:
+        X_raw = arrays[year][0]
+        nz = X_raw[:, pre.mask_] != 0
+        Z = pre.transform(X_raw, clip=False)
+        rows.append({"year": year, "n": len(X_raw), "mean_nonzero_rate": float(nz.mean()),
+                     "mean_nonzero_features": float(nz.sum(axis=1).mean()),
+                     "clip_share": float((np.abs(Z) > Z_CLIP).mean()), "mean_abs_z": float(np.abs(Z).mean(dtype=np.float64))})
+    return pd.DataFrame(rows)
+
+
 def plot_strategies(results: pd.DataFrame, path: Path) -> None:
     """Save F1 (top) and accuracy (bottom) by test year, one panel per classifier, one line per strategy.
 
@@ -343,10 +366,11 @@ def run_sustainable(
         "summary": summary_table(results),
         "cost": cost_table(results),
         "window_composition": window_composition(df),
+        "diagnostic": year_diagnostic(df),
     }
     save_table(results[EXPORT_COLUMNS], "step7_strategies")
     save_table(results, "step7_strategies_detail")  # + confusion counts, cost, window
-    for name in ("pooled", "vs_static", "summary", "cost", "window_composition"):
+    for name in ("pooled", "vs_static", "summary", "cost", "window_composition", "diagnostic"):
         save_table(tables[name], f"step7_{name}")
     with open(RESULTS_DIR / "step7_cost.md", "a", encoding="utf-8") as f:
         f.write("\nNotes: static seconds are the Step 4 model fit and exclude preprocessing; expanding, sliding and the "
