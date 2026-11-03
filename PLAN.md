@@ -106,14 +106,14 @@ Source: `reviews/step0_plan_review.md` (Decision log). Comment 10 was Rejected a
 
 ## Step 3: Preprocess (`src/preprocess.py`)
 
-**Approach.** `log1p` to tame the heavy tail (counts up to ~92,000), drop features that are non-zero in fewer than `MIN_SUPPORT = 10` training rows (this includes all-zero columns), then `StandardScaler` fit on training years only. Output float32. The minimum-support filter stops columns that are almost constant in training from getting huge z-scores on drifted test years.
+**Approach.** `log1p` to tame the heavy tail (counts up to ~92,000), drop features that are non-zero in fewer than `MIN_SUPPORT = 10` training rows (this includes all-zero columns), then `StandardScaler` fit on training years only, then clip the scaled values to a fixed ±`Z_CLIP = 10` (a constant, identical for train and test, nothing learned from any data). Output float32. The minimum-support filter removes the worst near-constant columns, but it does not stop extreme z-scores on drifted test years (measured: max abs z 212.7 in 2018, 150.6 in training), so the clip is what bounds them. **Changed after review comment 1** (the filter alone does not meet its stated purpose).
 
 **Functions.**
 - `check_no_overlap(train_years: Iterable[int], test_years: Iterable[int]) -> None`: raises `ValueError` if they share a year, if either is empty, or if `max(train_years) >= min(test_years)`. Not called by Step 2's `concept_drift_matrix` (exempt, see section 0).
 - `split_by_year(df, train_years, test_years) -> tuple[pd.DataFrame, pd.DataFrame]`: calls `check_no_overlap`, returns the train and test frames (rows selected by `year`).
 - `apply_log1p(X: np.ndarray) -> np.ndarray`: `np.log1p` as float32; raises on negative input.
 - `nonzero_feature_mask(X_train: np.ndarray, min_support: int = MIN_SUPPORT) -> np.ndarray`: boolean mask of columns with at least `min_support` (10) non-zero values in the training rows only. `MIN_SUPPORT = 10` is added to `src/config.py`.
-- `class Preprocessor` (sklearn-style): `fit(X_train_raw: np.ndarray) -> Preprocessor` (applies log1p, learns the mask, fits `StandardScaler`), `transform(X_raw: np.ndarray) -> np.ndarray` (log1p, mask, scale), `fit_transform`, attribute `kept_features_` (names/indices). Raises if `transform` is called before `fit`.
+- `class Preprocessor` (sklearn-like fit/transform, not a `BaseEstimator`): `fit(X_train_raw: np.ndarray) -> Preprocessor` (applies log1p, learns the mask, fits `StandardScaler`), `transform(X_raw: np.ndarray, clip: bool = True) -> np.ndarray` (log1p, mask, scale, clip to ±`Z_CLIP`; `clip=False` only for reporting), `fit_transform`, attribute `kept_features_` (names/indices). Raises if `transform` is called before `fit`.
 - `prepare_split(df, train_years, test_years) -> dict`: returns `X_train, y_train, years_train, X_test, y_test, years_test, preprocessor`; the preprocessor is fit on the training rows only.
 - `make_tuning_split(df) -> dict`: same, with train 2014-2015 and validate 2016.
 
