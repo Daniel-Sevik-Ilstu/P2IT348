@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+import numpy as np
 import pandas as pd
 
 from src.config import RESULTS_DIR, TEST_YEARS, TRAIN_YEARS
@@ -93,6 +94,19 @@ def run_step4(split: dict | None = None) -> tuple[dict, pd.DataFrame]:
     return models, report
 
 
+def test_duplicate_mask(df: pd.DataFrame, split: dict) -> np.ndarray:
+    """Mask over the test rows of `split`: True where the exact feature vector also occurs in the training years.
+
+    The mask is computed over all rows of df and then selected by year, so it lines up with split["X_test"] only if
+    split_by_year kept df row order; this is asserted against the split's years and labels.
+    """
+    sel = df["year"].isin(TEST_YEARS).to_numpy()
+    if not (np.array_equal(df.loc[sel, "year"].to_numpy(), split["years_test"])
+            and np.array_equal(df.loc[sel, "label"].to_numpy(), split["y_test"])):
+        raise ValueError("test rows of df are not aligned with the split's years_test/y_test")
+    return train_duplicate_mask(df)[sel]
+
+
 def run_step5(
     df: pd.DataFrame | None = None, split: dict | None = None, models: dict | None = None
 ) -> dict[str, pd.DataFrame]:
@@ -109,8 +123,7 @@ def run_step5(
     main_table = pooled_table(models, X_test, y_test)
     base = baseline_accuracy(y_test)
     main_table["baseline_accuracy"] = base  # majority-class reference for the accuracy column
-    # Mask over all rows of df; select the test rows (split_by_year keeps df order).
-    dup_mask = train_duplicate_mask(df)[df["year"].isin(TEST_YEARS).to_numpy()]
+    dup_mask = test_duplicate_mask(df, split)
     no_dup, _ = sensitivity_tables(models, X_test, y_test, years_test, dup_mask)
     confusion = confusion_table(models, X_test, y_test)
     save_table(main_table, "step5_metrics")
@@ -143,8 +156,8 @@ def run_step6(
     per_year = per_year_table(models, X_test, y_test, years_test)
     baseline = year_baseline_table(y_test, years_test)
     drift = drift_summary(per_year)
-    # Sensitivity: only test rows with no exact duplicate in 2014-2016 (mask is over all rows of df).
-    dup_mask = train_duplicate_mask(df)[df["year"].isin(TEST_YEARS).to_numpy()]
+    # Sensitivity: only test rows with no exact duplicate in 2014-2016.
+    dup_mask = test_duplicate_mask(df, split)
     _, per_year_nd = sensitivity_tables(models, X_test, y_test, years_test, dup_mask)
     save_table(by_year_export(per_year), "step6_by_year")
     save_table(baseline, "step6_baseline_by_year")
