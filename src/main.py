@@ -54,8 +54,10 @@ def run_step3(df: pd.DataFrame | None = None) -> dict:
     table = split_table(split)
     write_data_summary(counts, RESULTS_DIR / "step3_feature_counts")
     write_data_summary(table, RESULTS_DIR / "step3_split")
+    write_data_summary(split["clip_stats"], RESULTS_DIR / "step3_clip")
     pd.Series(pre.kept_features_, name="feature").to_csv(RESULTS_DIR / "step3_kept_features.csv", index=False)
     print(f"Step 3: X_train {split['X_train'].shape} {split['X_train'].dtype}, X_test {split['X_test'].shape}")
+    print(split["clip_stats"].to_string(index=False))
     print(counts.to_string(index=False))
     print(table.to_string(index=False))
     return split

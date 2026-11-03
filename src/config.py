@@ -13,6 +13,7 @@ CACHE_SCHEMA_VERSION: int = 1
 
 SEED: int = 42
 MIN_SUPPORT: int = 10  # used in Step 3
+Z_CLIP: float = 10.0  # Step 3: scaled values are clipped to +-Z_CLIP (constant, not learned)
 
 ALL_YEARS: tuple[int, ...] = tuple(range(2014, 2022))
 TRAIN_YEARS: tuple[int, ...] = (2014, 2015, 2016)

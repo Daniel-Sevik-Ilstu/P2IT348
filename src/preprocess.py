@@ -15,6 +15,7 @@ from src.config import (
     TUNE_TRAIN_YEARS,
     TUNE_VAL_YEAR,
     YEAR_COL,
+    Z_CLIP,
 )
 from src.data import feature_columns
 
@@ -78,12 +79,17 @@ class Preprocessor:
         self.scaler = StandardScaler().fit(X[:, self.mask_])
         return self
 
-    def transform(self, X_raw: np.ndarray) -> np.ndarray:
-        """Apply the fitted log1p, mask and scaler (never refits); returns float32."""
+    def transform(self, X_raw: np.ndarray, clip: bool = True) -> np.ndarray:
+        """Apply the fitted log1p, mask and scaler (never refits), clip to +-Z_CLIP; returns float32.
+
+        `clip=False` is only for reporting the size of the extreme values.
+        """
         if self.scaler is None or self.mask_ is None:
             raise RuntimeError("Preprocessor must be fit before transform")
         X = apply_log1p(X_raw)[:, self.mask_]
-        return self.scaler.transform(X).astype(np.float32)
+        Z = self.scaler.transform(X).astype(np.float32)
+        # Fixed constant clip: the same for train and test, nothing learned from any data.
+        return np.clip(Z, -Z_CLIP, Z_CLIP, out=Z) if clip else Z
 
     def fit_transform(self, X_train_raw: np.ndarray, feature_names: list[str] | None = None) -> np.ndarray:
         """Fit on the training counts and return them transformed."""
@@ -113,7 +119,20 @@ def prepare_split(
     a = _split_arrays(train, test, features)
     X_train_raw, X_test_raw = a.pop("X_train_raw"), a.pop("X_test_raw")
     pre = Preprocessor().fit(X_train_raw, features)  # training rows only
-    return {"X_train": pre.transform(X_train_raw), "X_test": pre.transform(X_test_raw), "preprocessor": pre, **a}
+    X_train, X_test = pre.transform(X_train_raw, clip=False), pre.transform(X_test_raw, clip=False)
+    clip_stats = clip_report(X_train, X_test)  # measured before clipping
+    np.clip(X_train, -Z_CLIP, Z_CLIP, out=X_train)
+    np.clip(X_test, -Z_CLIP, Z_CLIP, out=X_test)
+    return {"X_train": X_train, "X_test": X_test, "preprocessor": pre, "clip_stats": clip_stats, **a}
+
+
+def clip_report(X_train: np.ndarray, X_test: np.ndarray) -> pd.DataFrame:
+    """Max abs z and number of entries beyond +-Z_CLIP for UNCLIPPED scaled matrices; also the values after clipping."""
+    rows = []
+    for side, X in (("train", X_train), ("test", X_test)):
+        A = np.abs(X)
+        rows.append((side, float(A.max()), int((A > Z_CLIP).sum()), float(min(A.max(), Z_CLIP)), 0))
+    return pd.DataFrame(rows, columns=["side", "max_abs_z_before", "n_clipped", "max_abs_z_after", "n_beyond_clip_after"])
 
 
 def make_tuning_split(df: pd.DataFrame) -> dict:
