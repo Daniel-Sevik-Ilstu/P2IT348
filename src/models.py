@@ -5,6 +5,7 @@ import time
 import warnings
 from typing import Any
 
+import joblib
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
@@ -77,3 +78,10 @@ def train_with_report(split: dict) -> tuple[dict[str, Any], pd.DataFrame]:
         models[name] = model
         rows.append((name, round(seconds, 2), round(acc, 4), n_conv))
     return models, pd.DataFrame(rows, columns=["model", "train_seconds", "train_accuracy", "convergence_warnings"])
+
+
+def save_models(models: dict[str, Any], model_dir=MODEL_DIR) -> None:
+    """Save fitted models with joblib into a git-ignored folder."""
+    model_dir.mkdir(parents=True, exist_ok=True)
+    for name, model in models.items():
+        joblib.dump(model, model_dir / f"{name}.joblib")

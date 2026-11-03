@@ -7,6 +7,7 @@ import sys
 import pandas as pd
 
 from src.config import RESULTS_DIR, TEST_YEARS, TRAIN_YEARS
+from src.models import save_models, train_with_report
 from src.preprocess import filter_report, prepare_split, split_table
 from src.drift import run_drift_analysis
 from src.data import (
@@ -63,19 +64,33 @@ def run_step3(df: pd.DataFrame | None = None) -> dict:
     return split
 
 
+def run_step4(split: dict | None = None) -> pd.DataFrame:
+    """Step 4: train the three classifiers on 2014-2016; prints TRAINING-only sanity numbers."""
+    split = prepare_split(load_all(), TRAIN_YEARS, TEST_YEARS) if split is None else split
+    models, report = train_with_report(split)
+    save_models(models)
+    write_data_summary(report, RESULTS_DIR / "step4_training")
+    print("Step 4 (training-set sanity check only, NOT evaluation):")
+    print(report.to_string(index=False))
+    return report
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Run the pipeline (Steps 1-3 exist so far); --step N runs one step."""
+    """Run the pipeline (Steps 1-4 exist so far); --step N runs one step."""
     parser = argparse.ArgumentParser(description="Project 2 pipeline")
     parser.add_argument("--step", type=int, choices=range(1, 8), help="run a single step (1-7)")
     args = parser.parse_args(argv)
-    if args.step not in (None, 1, 2, 3):
+    if args.step not in (None, 1, 2, 3, 4):
         print(f"Step {args.step} is not implemented yet.", file=sys.stderr)
         return 1  # non-zero so callers can tell nothing ran
-    df = run_step1() if args.step in (None, 1, 2, 3) else None
+    df = run_step1() if args.step in (None, 1, 2, 3, 4) else None
     if args.step in (None, 2):
         run_step2(df)
+    split = None
     if args.step in (None, 3):
-        run_step3(df)
+        split = run_step3(df)
+    if args.step in (None, 4):
+        run_step4(split)
     return 0
 
 
