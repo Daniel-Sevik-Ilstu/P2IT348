@@ -25,6 +25,7 @@ from src.evaluate import (
 from src.models import save_models, train_all_from_split, train_with_report
 from src.preprocess import filter_report, prepare_split, split_table
 from src.drift import run_drift_analysis
+from src.sustainable import run_sustainable
 from src.data import (
     _row_hashes,
     train_duplicate_mask,
@@ -184,27 +185,50 @@ def run_step6(
     return out
 
 
+def run_step7(
+    df: pd.DataFrame | None = None, split: dict | None = None, models: dict | None = None,
+    step4_report: pd.DataFrame | None = None,
+) -> dict[str, pd.DataFrame]:
+    """Step 7: static vs expanding vs sliding vs incremental on 2017-2021; writes results/step7_*.
+
+    models/split: the Step 4 models and Step 3 split to reuse as the static baseline (built here when None).
+    step4_report: Step 4 training table, used only for the static fit time.
+    """
+    df = load_all() if df is None else df
+    if split is None:
+        split = prepare_split(df, TRAIN_YEARS, TEST_YEARS)
+    if models is None:
+        models, step4_report = train_with_report(split)  # fit on 2014-2016 only
+    seconds = dict(zip(step4_report["model"], step4_report["train_seconds"])) if step4_report is not None else None
+    tables = run_sustainable(df, split, models, seconds)
+    print("Step 7 (per test year; malware = positive class):")
+    print(tables["strategies"][["strategy", "classifier", "year", "n", "accuracy", "precision", "recall", "f1"]].round(4).to_string(index=False))
+    for name in ("summary", "pooled", "cost"):
+        print(f"Step 7 {name}:")
+        print(tables[name].round(4).to_string(index=False))
+    return tables
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Run the pipeline (Steps 1-6 exist so far); --step N runs one step."""
+    """Run the pipeline (Steps 1-7); --step N runs one step."""
     parser = argparse.ArgumentParser(description="Project 2 pipeline")
     parser.add_argument("--step", type=int, choices=range(1, 8), help="run a single step (1-7)")
     args = parser.parse_args(argv)
-    if args.step not in (None, 1, 2, 3, 4, 5, 6):
-        print(f"Step {args.step} is not implemented yet.", file=sys.stderr)
-        return 1  # non-zero so callers can tell nothing ran
     df = run_step1()
     if args.step in (None, 2):
         run_step2(df)
     split = None
     if args.step in (None, 3):
         split = run_step3(df)
-    models = None
+    models, report4 = None, None
     if args.step in (None, 4):
-        models, _ = run_step4(split)
+        models, report4 = run_step4(split)
     if args.step in (None, 5):
         run_step5(df, split, models)
     if args.step in (None, 6):
         run_step6(df, split, models)
+    if args.step in (None, 7):
+        run_step7(df, split, models, report4)
     return 0
 
 
