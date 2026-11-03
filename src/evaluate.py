@@ -93,6 +93,8 @@ def sensitivity_tables(
     if len(dup_mask) != len(y_test):
         raise ValueError(f"dup_mask has {len(dup_mask)} entries but there are {len(y_test)} test rows")
     keep = ~dup_mask
+    if keep.sum() == 0:
+        raise ValueError("every test row has an exact duplicate in the training years; nothing left to evaluate")
     pooled = pooled_table(models, X_test[keep], y_test[keep])
     pooled["n_excluded"] = int(dup_mask.sum())
     # Class counts kept and removed (label 1 = malware, 0 = benign).
