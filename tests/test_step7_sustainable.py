@@ -509,3 +509,24 @@ def test_real_data_every_window_year_has_files(real_data_dir):
     for t in TEST_YEARS:
         for strategy in ("static", "expanding", "sliding"):
             assert set(window_years(strategy, t)) <= years
+
+
+# ---------------------------------------------------------------- accepted review comments (builder fixes)
+def test_static_from_models_rejects_wrong_training_years():
+    """Review comment 1: the static split must be trained on exactly 2014-2016."""
+    df = _drift_frame()
+    split = prepare_split(df, TRAIN_YEARS, TEST_YEARS)
+    bad = {**split, "years_train": np.where(split["years_train"] == 2016, 2017, split["years_train"])}
+    with pytest.raises(ValueError):
+        sustainable.static_from_models(bad, {})
+
+
+def test_static_from_models_rejects_mismatched_test_labels():
+    """Review comment 1: static test labels per year must equal the arrays the other strategies use."""
+    df = _drift_frame()
+    split = prepare_split(df, TRAIN_YEARS, TEST_YEARS)
+    arrays = sustainable.year_arrays(df)
+    sustainable.static_from_models(split, {}, arrays=arrays)  # consistent: no error
+    flipped = {**split, "y_test": 1 - split["y_test"]}
+    with pytest.raises(ValueError):
+        sustainable.static_from_models(flipped, {}, arrays=arrays)

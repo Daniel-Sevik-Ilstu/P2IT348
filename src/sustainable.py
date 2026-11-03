@@ -143,10 +143,23 @@ def run_incremental(df: pd.DataFrame, model_name: str = "sgd", arrays: YearArray
     return pd.DataFrame(rows)
 
 
-def static_from_models(split: dict, models: dict[str, Any], train_seconds: dict[str, float] | None = None) -> pd.DataFrame:
-    """Static rows from the already fitted Step 4 models (nothing is refitted). train_seconds: Step 4 fit times."""
-    rows = []
+def static_from_models(
+    split: dict, models: dict[str, Any], train_seconds: dict[str, float] | None = None,
+    arrays: YearArrays | None = None,
+) -> pd.DataFrame:
+    """Static rows from the already fitted Step 4 models (nothing is refitted). train_seconds: Step 4 fit times.
+
+    Raises ValueError if the split's training years are not exactly TRAIN_YEARS, or (when `arrays` is given) if the
+    split's test labels of a year differ from the labels the other strategies score (`arrays[t][1]`).
+    """
     years_train = tuple(sorted(set(split["years_train"].tolist())))
+    if years_train != tuple(TRAIN_YEARS):
+        raise ValueError(f"static split must be trained on exactly {tuple(TRAIN_YEARS)}, got {years_train}")
+    if arrays is not None:  # same test rows as every other strategy
+        for t in TEST_YEARS:
+            if not np.array_equal(split["y_test"][split["years_test"] == t], arrays[t][1]):
+                raise ValueError(f"static test labels for {t} differ from the labels used by the other strategies")
+    rows = []
     for name, model in models.items():
         pred = model.predict(split["X_test"])
         for t in TEST_YEARS:
@@ -176,7 +189,7 @@ def run_all_strategies(
     for name, strategies in plan.items():
         for strategy in strategies:
             if strategy == "static" and split is not None and models is not None and name in models:
-                parts.append(static_from_models(split, {name: models[name]}, step4_seconds))
+                parts.append(static_from_models(split, {name: models[name]}, step4_seconds, arrays))
             elif strategy == "incremental":
                 parts.append(run_incremental(df, name, arrays))
             else:
