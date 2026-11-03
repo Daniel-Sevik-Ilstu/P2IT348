@@ -530,3 +530,12 @@ def test_static_from_models_rejects_mismatched_test_labels():
     flipped = {**split, "y_test": 1 - split["y_test"]}
     with pytest.raises(ValueError):
         sustainable.static_from_models(flipped, {}, arrays=arrays)
+
+
+def test_missing_year_raises_clear_value_error():
+    """Review comment 7: a missing training or test year raises ValueError naming the year, before any fit."""
+    df = _drift_frame(years=[y for y in ALL_YEARS if y != 2019], rows=30)
+    with pytest.raises(ValueError, match="2019"):
+        run_all_strategies(df, rf=False)
+    with pytest.raises(ValueError, match="2015"):
+        window_composition(_drift_frame(years=[y for y in ALL_YEARS if y != 2015], rows=30))

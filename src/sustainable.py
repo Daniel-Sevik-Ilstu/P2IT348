@@ -46,8 +46,16 @@ def window_years(strategy: str, t: int) -> tuple[int, ...]:
     return years
 
 
+def check_years_present(df: pd.DataFrame) -> None:
+    """Raise a ValueError naming any training or test year that has no rows in `df`."""
+    missing = sorted((set(TRAIN_YEARS) | set(TEST_YEARS)) - set(df[YEAR_COL].unique().tolist()))
+    if missing:
+        raise ValueError(f"Step 7 needs data for years {sorted(set(TRAIN_YEARS) | set(TEST_YEARS))}; missing {missing}")
+
+
 def year_arrays(df: pd.DataFrame) -> YearArrays:
     """Raw float32 feature matrix and labels per year, extracted once so windows only concatenate."""
+    check_years_present(df)
     features = feature_columns(df)
     out: YearArrays = {}
     for year, g in df.groupby(YEAR_COL, sort=True):
@@ -262,6 +270,7 @@ def window_composition(df: pd.DataFrame) -> pd.DataFrame:
     The incremental model has seen the same years as the expanding window (2014..t-1) but through the single
     pass of `partial_fit`; its preprocessor only ever saw 2014-2016.
     """
+    check_years_present(df)
     counts = df.groupby(YEAR_COL).size()
     rows = []
     for strategy in STRATEGIES:
