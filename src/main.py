@@ -111,7 +111,9 @@ def run_step5(
     base = baseline_accuracy(y_test)
     print(f"Step 5 (pooled test years, n={len(y_test)}; majority-class accuracy {base:.4f}):")
     print(main_table.round(4).to_string(index=False))
-    print(f"Sensitivity (no exact training duplicate; {int(dup_mask.sum())} test rows excluded):")
+    base_nd = baseline_accuracy(y_test[~dup_mask])
+    print(f"Sensitivity (no exact training duplicate; {int(dup_mask.sum())} test rows excluded; "
+          f"majority-class accuracy of subset {base_nd:.4f}):")
     print(no_dup.round(4).to_string(index=False))
     print(confusion.to_string(index=False))
     return {"metrics": main_table, "no_dup": no_dup, "confusion": confusion}

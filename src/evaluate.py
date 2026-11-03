@@ -86,6 +86,8 @@ def sensitivity_tables(
     """Pooled and per-year tables on test rows with NO exact duplicate in the training years (dup_mask False).
 
     Each table gets an n_excluded column (rows removed by the filter; per year for the per-year table).
+    The pooled table also gets n_malware/n_benign (kept) and n_excluded_malware/n_excluded_benign, so the
+    change in class mix caused by the filter is visible.
     """
     dup_mask = np.asarray(dup_mask, dtype=bool)
     if len(dup_mask) != len(y_test):
@@ -93,6 +95,11 @@ def sensitivity_tables(
     keep = ~dup_mask
     pooled = pooled_table(models, X_test[keep], y_test[keep])
     pooled["n_excluded"] = int(dup_mask.sum())
+    # Class counts kept and removed (label 1 = malware, 0 = benign).
+    pooled["n_malware"] = int((y_test[keep] == 1).sum())
+    pooled["n_benign"] = int((y_test[keep] == 0).sum())
+    pooled["n_excluded_malware"] = int((y_test[dup_mask] == 1).sum())
+    pooled["n_excluded_benign"] = int((y_test[dup_mask] == 0).sum())
     per_year = per_year_table(models, X_test[keep], y_test[keep], years_test[keep])
     excluded = pd.Series(years_test[dup_mask]).value_counts()
     per_year["n_excluded"] = per_year["year"].map(lambda y: int(excluded.get(y, 0)))
