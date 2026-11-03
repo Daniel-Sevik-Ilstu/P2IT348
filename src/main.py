@@ -177,7 +177,7 @@ def run_step6(
         save_table(split["clip_by_year"], "step6_clip_by_year")
         print("Clip share and mean |z| by year (before clipping):")
         print(split["clip_by_year"].round(4).to_string(index=False))
-        out["clip_by_year"] = split["clip_by_year"]
+        out["clip_by_year"] = split["clip_by_year"].query("side == 'test'")  # file keeps train rows as reference
     return out
 
 
