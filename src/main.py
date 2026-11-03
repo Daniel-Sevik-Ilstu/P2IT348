@@ -73,22 +73,31 @@ def run_step3(df: pd.DataFrame | None = None) -> dict:
     return split
 
 
-def run_step4(split: dict | None = None) -> pd.DataFrame:
-    """Step 4: train the three classifiers on 2014-2016; prints TRAINING-only sanity numbers."""
+def run_step4(split: dict | None = None) -> tuple[dict, pd.DataFrame]:
+    """Step 4: train the three classifiers on 2014-2016; prints TRAINING-only sanity numbers.
+
+    Returns (models, report) so Step 5 can reuse the fitted models instead of retraining.
+    """
     split = prepare_split(load_all(), TRAIN_YEARS, TEST_YEARS) if split is None else split
     models, report = train_with_report(split)
     save_models(models)
     write_data_summary(report, RESULTS_DIR / "step4_training")
     print("Step 4 (training-set sanity check only, NOT evaluation):")
     print(report.to_string(index=False))
-    return report
+    return models, report
 
 
-def run_step5(df: pd.DataFrame | None = None, split: dict | None = None) -> dict[str, pd.DataFrame]:
-    """Step 5: evaluate the three classifiers on the pooled test years 2017-2021; writes results/step5_*."""
+def run_step5(
+    df: pd.DataFrame | None = None, split: dict | None = None, models: dict | None = None
+) -> dict[str, pd.DataFrame]:
+    """Step 5: evaluate the three classifiers on the pooled test years 2017-2021; writes results/step5_*.
+
+    models: fitted Step 4 classifiers to reuse; trained on 2014-2016 here only when None (e.g. --step 5 alone).
+    """
     df = load_all() if df is None else df
     split = prepare_split(df, TRAIN_YEARS, TEST_YEARS) if split is None else split
-    models = train_all_from_split(split)  # fit on 2014-2016 only
+    if models is None:
+        models = train_all_from_split(split)  # fit on 2014-2016 only
     X_test, y_test, years_test = split["X_test"], split["y_test"], split["years_test"]
     assert_test_years_only(years_test)
     main_table = pooled_table(models, X_test, y_test)
@@ -122,10 +131,11 @@ def main(argv: list[str] | None = None) -> int:
     split = None
     if args.step in (None, 3):
         split = run_step3(df)
+    models = None
     if args.step in (None, 4):
-        run_step4(split)
+        models, _ = run_step4(split)
     if args.step in (None, 5):
-        run_step5(df, split)
+        run_step5(df, split, models)
     return 0
 
 
