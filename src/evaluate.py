@@ -126,6 +126,9 @@ def plot_by_year(per_year: pd.DataFrame, path: Path) -> None:
         for name, g in per_year.groupby("model", sort=False):
             g = g.sort_values("year")
             ax.plot(g["year"], g[metric], marker="o", label=name)
+        if metric == "accuracy":  # chance level for a balanced test year
+            ax.axhline(0.5, ls="--", color="gray", label="chance (majority class) = 0.5")
+            ax.legend(fontsize=8)
         ax.set_title(f"{metric.upper() if metric == 'f1' else metric.capitalize()} by test year")
         ax.set_xlabel("test year")
         ax.set_xticks(sorted(per_year["year"].unique()))
