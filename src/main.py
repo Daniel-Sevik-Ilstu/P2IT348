@@ -50,7 +50,7 @@ def run_step3(df: pd.DataFrame | None = None) -> dict:
     df = load_all() if df is None else df
     split = prepare_split(df, TRAIN_YEARS, TEST_YEARS)
     pre = split["preprocessor"]
-    counts = filter_report(df, pre, TRAIN_YEARS, TEST_YEARS)
+    counts = filter_report(df, pre, TEST_YEARS)
     table = split_table(split)
     write_data_summary(counts, RESULTS_DIR / "step3_feature_counts")
     write_data_summary(table, RESULTS_DIR / "step3_split")

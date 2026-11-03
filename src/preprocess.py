@@ -151,7 +151,7 @@ def make_tuning_split(df: pd.DataFrame) -> dict:
     return prepare_split(df, TUNE_TRAIN_YEARS, (TUNE_VAL_YEAR,))
 
 
-def filter_report(df: pd.DataFrame, pre: Preprocessor, train_years: Iterable[int], test_years: Iterable[int]) -> pd.DataFrame:
+def filter_report(df: pd.DataFrame, pre: Preprocessor, test_years: Iterable[int]) -> pd.DataFrame:
     """Feature counts after each filter, plus columns active in the test years but dropped by the training-only mask."""
     features = feature_columns(df)
     test = df[df[YEAR_COL].isin(tuple(test_years))]
