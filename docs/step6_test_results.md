@@ -92,7 +92,7 @@ What this shows: (1) The clipped share is small in every year (at most 1.06% of 
 | random_forest | 0.9580 | 0.6701 | 0.2879 | -0.0845 |
 | sgd | 0.9039 | 0.6695 | 0.2344 | -0.0720 |
 
-The slope is a straight-line fit over five points whose pattern is a step, so it describes the size of the drop but not its shape. SGD has the smallest drop only because it starts lowest in 2017.
+The slope is a straight-line fit over five points whose pattern is a step, so it is descriptive only: it suggests a gradual decline of about 0.07-0.08 F1 per year that the data do not show, and the fit is unweighted although 2017 and 2018 have six times as many rows as the other years. The change that matters is the 2018 to 2019 step: F1 falls from 0.9348 to 0.6796 (-0.2552) for logreg, from 0.9409 to 0.6875 (-0.2534) for random forest and from 0.9178 to 0.6768 (-0.2410) for SGD, against changes of -0.017 to +0.014 from 2017 to 2018 and within 0.018 from 2019 to 2021. SGD has the smallest drop only because it starts lowest in 2017.
 
 **Classifier comparison.** The random forest has the highest F1 in 2017, 2018 and 2019 and logreg is close behind (0.006-0.007 lower in 2017-2018). SGD is lowest in 2017 and 2018 (F1 0.9039 and 0.9178; 0.048-0.054 below the others in 2017, 0.017-0.023 in 2018). In 2020 and 2021 the three classifiers are within 0.005 (2020) and 0.001 (2021) F1 of each other. None of the three is robust to the change at 2019, and no classifier ranking in 2019-2021 is reliable (see noise below).
 
