@@ -26,3 +26,11 @@ One row per comment above, with the same number. Decision is Accepted or Rejecte
 
 | # | Decision | Reason | Fixed in commit |
 | --- | --- | --- | --- |
+| 1 | Accepted | The year guard checks only years_train metadata, not X_train and y_train, and passes for an empty set. Add one helper that raises ValueError if years_train is empty, lengths of years_train, X_train and y_train differ, years are not a subset of the training years, or y_train is not exactly the classes 0 and 1. Also call check_no_overlap against the test years as PLAN.md section 0 requires. | |
+| 2 | Accepted | The guard is duplicated, and the pipeline runs a copy instead of the function PLAN.md names and the tests target. Make train_with_report use the shared helper from comment 1 so there is one place that checks and one place that fits. | |
+| 3 | Accepted | Non-convergence warnings are counted but other warnings are silently dropped. Re-emit or store all recorded warning messages in the training report, and log the model name and n_iter_ for any ConvergenceWarning. Do not stop the pipeline on a non-zero count, since it is 0 now; just report it. | |
+| 4 | Accepted | Report-only: say in docs/step4_models.md that the three models are effectively unweighted because the training years are balanced (27,000 and 27,000). No code change. | |
+| 5 | Accepted | Report-only: state in docs/step4_models.md that no tuning was done and C, alpha and n_estimators are defaults, not tuned on 2016. Skipping the optional grid search because the plan marks it as only if time allows. | |
+| 6 | Accepted | Partly: add the missing model_dir type hint as AGENTS.md requires. Not saving the preprocessor, because nothing reads the saved models and Step 7 refits preprocessing every time. | |
+| 7 | Rejected | The reviewer found no leakage and says no change is required. Step 5 needs the same split, so passing only the training part would add code for no benefit. | — |
+| 8 | Rejected | Style preference on a helper name, already declined in Steps 1 to 3 for the same reason. Renaming a shared helper adds churn for no correctness gain. | — |
