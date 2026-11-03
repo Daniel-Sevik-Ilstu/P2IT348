@@ -258,7 +258,7 @@ def cost_table(results: pd.DataFrame) -> pd.DataFrame:
             secs = g["train_seconds"].iloc[:1]  # one fit, paid once
         else:
             secs = g["train_seconds"]
-        rows.append({"strategy": strategy, "classifier": clf, "n_fits": len(secs), "total_seconds": secs.sum(),
+        rows.append({"strategy": strategy, "classifier": clf, "n_fits": len(secs), "total_seconds": secs.sum(min_count=1),  # NaN (not 0.0) when the seconds are unknown
                      "mean_seconds_per_update": secs.mean(), "max_seconds": secs.max(),
                      "mean_train_rows": g["train_rows"].mean()})
     return pd.DataFrame(rows)

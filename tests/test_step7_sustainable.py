@@ -539,3 +539,13 @@ def test_missing_year_raises_clear_value_error():
         run_all_strategies(df, rf=False)
     with pytest.raises(ValueError, match="2015"):
         window_composition(_drift_frame(years=[y for y in ALL_YEARS if y != 2015], rows=30))
+
+
+def test_cost_table_reports_nan_not_zero_when_static_seconds_missing():
+    """Review comment 5: unknown static seconds must stay NaN in cost_table, never a silent 0.0."""
+    df = _drift_frame()
+    split = prepare_split(df, TRAIN_YEARS, TEST_YEARS)
+    models = models_mod.train_all_from_split(split)
+    out = sustainable.static_from_models(split, models, train_seconds=None)
+    cost = sustainable.cost_table(out)
+    assert cost["total_seconds"].isna().all() and cost["mean_seconds_per_update"].isna().all()
