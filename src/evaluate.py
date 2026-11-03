@@ -155,6 +155,7 @@ def sensitivity_tables(
     """Pooled and per-year tables on test rows with NO exact duplicate in the training years (dup_mask False).
 
     Each table gets an n_excluded column (rows removed by the filter; per year for the per-year table).
+    The per-year table also gets n_malware, n_benign and baseline_accuracy of the kept rows of that year.
     The pooled table also gets n_malware/n_benign (kept) and n_excluded_malware/n_excluded_benign, so the
     change in class mix caused by the filter is visible.
     """
@@ -174,6 +175,10 @@ def sensitivity_tables(
     per_year = per_year_table(models, X_test[keep], y_test[keep], years_test[keep])
     excluded = pd.Series(years_test[dup_mask]).value_counts()
     per_year["n_excluded"] = per_year["year"].map(lambda y: int(excluded.get(y, 0)))
+    # Class mix of the kept rows per year, so accuracy can be read against that subset's own majority baseline.
+    mix = year_baseline_table(y_test[keep], years_test[keep]).set_index("year")
+    for col in ("n_malware", "n_benign", "baseline_accuracy"):
+        per_year[col] = per_year["year"].map(mix[col])
     return pooled, per_year
 
 
