@@ -7,11 +7,20 @@ import sys
 import pandas as pd
 
 from src.config import RESULTS_DIR, TEST_YEARS, TRAIN_YEARS
-from src.models import save_models, train_with_report
+from src.evaluate import (
+    assert_test_years_only,
+    baseline_accuracy,
+    confusion_table,
+    pooled_table,
+    save_table,
+    sensitivity_tables,
+)
+from src.models import save_models, train_all_from_split, train_with_report
 from src.preprocess import filter_report, prepare_split, split_table
 from src.drift import run_drift_analysis
 from src.data import (
     _row_hashes,
+    train_duplicate_mask,
     feature_columns,
     file_table,
     label_conflict_mask,
@@ -75,15 +84,39 @@ def run_step4(split: dict | None = None) -> pd.DataFrame:
     return report
 
 
+def run_step5(df: pd.DataFrame | None = None, split: dict | None = None) -> dict[str, pd.DataFrame]:
+    """Step 5: evaluate the three classifiers on the pooled test years 2017-2021; writes results/step5_*."""
+    df = load_all() if df is None else df
+    split = prepare_split(df, TRAIN_YEARS, TEST_YEARS) if split is None else split
+    models = train_all_from_split(split)  # fit on 2014-2016 only
+    X_test, y_test, years_test = split["X_test"], split["y_test"], split["years_test"]
+    assert_test_years_only(years_test)
+    main_table = pooled_table(models, X_test, y_test)
+    # Mask over all rows of df; select the test rows (split_by_year keeps df order).
+    dup_mask = train_duplicate_mask(df)[df["year"].isin(TEST_YEARS).to_numpy()]
+    no_dup, _ = sensitivity_tables(models, X_test, y_test, years_test, dup_mask)
+    confusion = confusion_table(models, X_test, y_test)
+    save_table(main_table, "step5_metrics")
+    save_table(no_dup, "step5_pooled_no_dup")
+    save_table(confusion, "step5_confusion")
+    base = baseline_accuracy(y_test)
+    print(f"Step 5 (pooled test years, n={len(y_test)}; majority-class accuracy {base:.4f}):")
+    print(main_table.round(4).to_string(index=False))
+    print(f"Sensitivity (no exact training duplicate; {int(dup_mask.sum())} test rows excluded):")
+    print(no_dup.round(4).to_string(index=False))
+    print(confusion.to_string(index=False))
+    return {"metrics": main_table, "no_dup": no_dup, "confusion": confusion}
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Run the pipeline (Steps 1-4 exist so far); --step N runs one step."""
+    """Run the pipeline (Steps 1-5 exist so far); --step N runs one step."""
     parser = argparse.ArgumentParser(description="Project 2 pipeline")
     parser.add_argument("--step", type=int, choices=range(1, 8), help="run a single step (1-7)")
     args = parser.parse_args(argv)
-    if args.step not in (None, 1, 2, 3, 4):
+    if args.step not in (None, 1, 2, 3, 4, 5):
         print(f"Step {args.step} is not implemented yet.", file=sys.stderr)
         return 1  # non-zero so callers can tell nothing ran
-    df = run_step1() if args.step in (None, 1, 2, 3, 4) else None
+    df = run_step1()
     if args.step in (None, 2):
         run_step2(df)
     split = None
@@ -91,6 +124,8 @@ def main(argv: list[str] | None = None) -> int:
         split = run_step3(df)
     if args.step in (None, 4):
         run_step4(split)
+    if args.step in (None, 5):
+        run_step5(df, split)
     return 0
 
 

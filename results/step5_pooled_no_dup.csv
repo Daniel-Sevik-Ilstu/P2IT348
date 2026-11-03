@@ -1,0 +1,4 @@
+model,accuracy,precision,recall,f1,n_test,n_excluded
+logreg,0.848,0.7695,0.9318,0.8429,37257,7743
+random_forest,0.8544,0.7735,0.9434,0.8501,37257,7743
+sgd,0.8475,0.7636,0.9433,0.844,37257,7743
