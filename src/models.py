@@ -85,14 +85,12 @@ def train_all_from_split(split: dict) -> dict[str, Any]:
 
 
 def train_with_report(split: dict) -> tuple[dict[str, Any], pd.DataFrame]:
-    """Train all models (with the same year guard) and return them plus a TRAINING-only sanity table.
+    """Train all models (with the shared guard) and return them plus a TRAINING-only sanity table.
 
     Columns: model, train_seconds, train_accuracy, convergence_warnings. The accuracy is measured on the
     training rows themselves; it is a sanity check, not an evaluation.
     """
-    years = set(np.unique(split["years_train"]).tolist())
-    if not years <= set(TRAIN_YEARS):
-        raise ValueError(f"training data contains years outside {TRAIN_YEARS}")
+    _check_training_split(split)  # same guard as train_all_from_split
     models: dict[str, Any] = {}
     rows = []
     for name in MODEL_NAMES:
