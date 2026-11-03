@@ -81,6 +81,8 @@ class Preprocessor:
         self.mask_ = nonzero_feature_mask(X, self.min_support)
         self.n_all_zero_ = int((~(X != 0).any(axis=0)).sum())
         names = feature_names if feature_names is not None else [str(i) for i in range(X.shape[1])]
+        if len(names) != X.shape[1]:
+            raise ValueError(f"got {len(names)} feature names for {X.shape[1]} columns")
         self.feature_names_in_ = list(names)
         self.kept_features_ = [n for n, keep in zip(names, self.mask_) if keep]
         self.scaler = StandardScaler().fit(X[:, self.mask_])
@@ -93,6 +95,8 @@ class Preprocessor:
         """
         if self.scaler is None or self.mask_ is None:
             raise RuntimeError("Preprocessor must be fit before transform")
+        if X_raw.shape[1] != len(self.mask_):
+            raise ValueError(f"expected {len(self.mask_)} columns (as in fit), got {X_raw.shape[1]}")
         X = apply_log1p(X_raw)[:, self.mask_]
         Z = self.scaler.transform(X).astype(np.float32)
         # Fixed constant clip: the same for train and test, nothing learned from any data.
