@@ -44,7 +44,7 @@ One row per test function.
 | test_dropped_column_cannot_produce_large_zscore_on_test | Test z-scores stay modest (no huge values from dropped near-constant columns) |
 | test_constant_nonzero_column_does_not_create_nan_or_inf | Constant non-zero column yields no NaN/inf |
 | test_nan_in_input_raises_or_yields_finite_output | NaN input raises ValueError or yields finite output (not silent NaN) |
-| test_real_data_split_has_no_year_overlap_and_matching_columns | Real data: years, shared column count <= 1848, train mean ~0, float32 (skipped without input_data/) |
+| test_real_data_split_has_no_year_overlap_and_matching_columns | Real data: years, shared column count <= 1848, training column means small (|mean| < 0.05, allowing the clip shift), all scaled values within +-10, float32 (skipped without input_data/) |
 
 ## Failures and decisions (student)
 
@@ -315,4 +315,111 @@ PASSED tests/test_step3_preprocess.py::test_constant_nonzero_column_does_not_cre
 PASSED tests/test_step3_preprocess.py::test_nan_in_input_raises_or_yields_finite_output
 FAILED tests/test_step3_preprocess.py::test_real_data_split_has_no_year_overlap_and_matching_columns
 =================== 1 failed, 37 passed, 1 warning in 7.27s ===================
+```
+
+### Run 3: PASSED
+
+- Time: 2026-11-03T02:26:59+02:00
+- Commit: 92a7a5f
+- Result: 38 passed, 1 warning in 5.24s
+- Files: test_step3_preprocess.py
+
+```
+============================= test session starts =============================
+platform win32 -- Python 3.11.4, pytest-9.2.0, pluggy-1.7.0 -- C:\Program Files\Python311\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\thema\OneDrive\Desktop\Project2\project2-harness2\project2-harness2
+configfile: pytest.ini
+plugins: anyio-4.8.0, dash-2.18.1
+collecting ... collected 38 items
+
+tests/test_step3_preprocess.py::test_train_and_test_share_no_years_in_prepare_split PASSED [  2%]
+tests/test_step3_preprocess.py::test_prepare_split_train_years_exactly_2014_2016_and_test_2017_2021 PASSED [  5%]
+tests/test_step3_preprocess.py::test_every_test_year_is_later_than_every_training_year PASSED [  7%]
+tests/test_step3_preprocess.py::test_split_row_counts_and_alignment PASSED [ 10%]
+tests/test_step3_preprocess.py::test_split_by_year_returns_disjoint_rows_of_requested_years PASSED [ 13%]
+tests/test_step3_preprocess.py::test_check_no_overlap_accepts_valid_split PASSED [ 15%]
+tests/test_step3_preprocess.py::test_check_no_overlap_raises_on_bad_splits[train0-test0] PASSED [ 18%]
+tests/test_step3_preprocess.py::test_check_no_overlap_raises_on_bad_splits[train1-test1] PASSED [ 21%]
+tests/test_step3_preprocess.py::test_check_no_overlap_raises_on_bad_splits[train2-test2] PASSED [ 23%]
+tests/test_step3_preprocess.py::test_check_no_overlap_raises_on_bad_splits[train3-test3] PASSED [ 26%]
+tests/test_step3_preprocess.py::test_check_no_overlap_raises_on_bad_splits[train4-test4] PASSED [ 28%]
+tests/test_step3_preprocess.py::test_split_by_year_raises_on_overlap PASSED [ 31%]
+tests/test_step3_preprocess.py::test_split_by_year_missing_requested_year_fails_loudly PASSED [ 34%]
+tests/test_step3_preprocess.py::test_prepare_split_missing_test_year_fails_loudly PASSED [ 36%]
+tests/test_step3_preprocess.py::test_tuning_split_uses_2014_2015_train_and_2016_validation_only PASSED [ 39%]
+tests/test_step3_preprocess.py::test_train_and_test_have_identical_column_count_and_order PASSED [ 42%]
+tests/test_step3_preprocess.py::test_transform_gives_same_columns_for_train_and_test_values PASSED [ 44%]
+tests/test_step3_preprocess.py::test_training_columns_have_mean_zero_and_std_one PASSED [ 47%]
+tests/test_step3_preprocess.py::test_test_data_is_transformed_not_refit PASSED [ 50%]
+tests/test_step3_preprocess.py::test_fitted_statistics_equal_training_only_statistics PASSED [ 52%]
+tests/test_step3_preprocess.py::test_changing_test_rows_does_not_change_fitted_scaler_or_mask PASSED [ 55%]
+tests/test_step3_preprocess.py::test_transform_does_not_modify_fitted_scaler PASSED [ 57%]
+tests/test_step3_preprocess.py::test_output_is_float32_and_finite PASSED [ 60%]
+tests/test_step3_preprocess.py::test_fit_transform_equals_fit_then_transform PASSED [ 63%]
+tests/test_step3_preprocess.py::test_transform_before_fit_raises PASSED  [ 65%]
+tests/test_step3_preprocess.py::test_apply_log1p_equals_numpy_log1p_and_float32 PASSED [ 68%]
+tests/test_step3_preprocess.py::test_apply_log1p_negative_input_raises PASSED [ 71%]
+tests/test_step3_preprocess.py::test_log1p_compresses_heavy_tail PASSED  [ 73%]
+tests/test_step3_preprocess.py::test_min_support_constant_is_10 PASSED   [ 76%]
+tests/test_step3_preprocess.py::test_mask_nine_nonzero_dropped_ten_kept PASSED [ 78%]
+tests/test_step3_preprocess.py::test_mask_all_zero_column_dropped PASSED [ 81%]
+tests/test_step3_preprocess.py::test_mask_custom_min_support PASSED      [ 84%]
+tests/test_step3_preprocess.py::test_preprocessor_drops_zero_low_support_and_test_only_columns PASSED [ 86%]
+tests/test_step3_preprocess.py::test_mask_ignores_test_rows PASSED       [ 89%]
+tests/test_step3_preprocess.py::test_dropped_column_cannot_produce_large_zscore_on_test PASSED [ 92%]
+tests/test_step3_preprocess.py::test_constant_nonzero_column_does_not_create_nan_or_inf PASSED [ 94%]
+tests/test_step3_preprocess.py::test_nan_in_input_raises_or_yields_finite_output PASSED [ 97%]
+tests/test_step3_preprocess.py::test_real_data_split_has_no_year_overlap_and_matching_columns PASSED [100%]
+
+============================== warnings summary ===============================
+..\..\..\..\..\AppData\Roaming\Python\Python311\site-packages\dash\testing\plugin.py:92
+  C:\Users\thema\AppData\Roaming\Python\Python311\site-packages\dash\testing\plugin.py:92: PytestRemovedIn10Warning: The hookimpl pytest_addhooks uses old-style configuration options (marks or attributes).
+  Please use the pytest.hookimpl(tryfirst=True) decorator instead
+   to configure the hooks.
+   See https://docs.pytest.org/en/latest/deprecations.html#configuring-hook-specs-impls-using-markers
+    @pytest.mark.tryfirst
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=================================== PASSES ====================================
+=========================== short test summary info ===========================
+PASSED tests/test_step3_preprocess.py::test_train_and_test_share_no_years_in_prepare_split
+PASSED tests/test_step3_preprocess.py::test_prepare_split_train_years_exactly_2014_2016_and_test_2017_2021
+PASSED tests/test_step3_preprocess.py::test_every_test_year_is_later_than_every_training_year
+PASSED tests/test_step3_preprocess.py::test_split_row_counts_and_alignment
+PASSED tests/test_step3_preprocess.py::test_split_by_year_returns_disjoint_rows_of_requested_years
+PASSED tests/test_step3_preprocess.py::test_check_no_overlap_accepts_valid_split
+PASSED tests/test_step3_preprocess.py::test_check_no_overlap_raises_on_bad_splits[train0-test0]
+PASSED tests/test_step3_preprocess.py::test_check_no_overlap_raises_on_bad_splits[train1-test1]
+PASSED tests/test_step3_preprocess.py::test_check_no_overlap_raises_on_bad_splits[train2-test2]
+PASSED tests/test_step3_preprocess.py::test_check_no_overlap_raises_on_bad_splits[train3-test3]
+PASSED tests/test_step3_preprocess.py::test_check_no_overlap_raises_on_bad_splits[train4-test4]
+PASSED tests/test_step3_preprocess.py::test_split_by_year_raises_on_overlap
+PASSED tests/test_step3_preprocess.py::test_split_by_year_missing_requested_year_fails_loudly
+PASSED tests/test_step3_preprocess.py::test_prepare_split_missing_test_year_fails_loudly
+PASSED tests/test_step3_preprocess.py::test_tuning_split_uses_2014_2015_train_and_2016_validation_only
+PASSED tests/test_step3_preprocess.py::test_train_and_test_have_identical_column_count_and_order
+PASSED tests/test_step3_preprocess.py::test_transform_gives_same_columns_for_train_and_test_values
+PASSED tests/test_step3_preprocess.py::test_training_columns_have_mean_zero_and_std_one
+PASSED tests/test_step3_preprocess.py::test_test_data_is_transformed_not_refit
+PASSED tests/test_step3_preprocess.py::test_fitted_statistics_equal_training_only_statistics
+PASSED tests/test_step3_preprocess.py::test_changing_test_rows_does_not_change_fitted_scaler_or_mask
+PASSED tests/test_step3_preprocess.py::test_transform_does_not_modify_fitted_scaler
+PASSED tests/test_step3_preprocess.py::test_output_is_float32_and_finite
+PASSED tests/test_step3_preprocess.py::test_fit_transform_equals_fit_then_transform
+PASSED tests/test_step3_preprocess.py::test_transform_before_fit_raises
+PASSED tests/test_step3_preprocess.py::test_apply_log1p_equals_numpy_log1p_and_float32
+PASSED tests/test_step3_preprocess.py::test_apply_log1p_negative_input_raises
+PASSED tests/test_step3_preprocess.py::test_log1p_compresses_heavy_tail
+PASSED tests/test_step3_preprocess.py::test_min_support_constant_is_10
+PASSED tests/test_step3_preprocess.py::test_mask_nine_nonzero_dropped_ten_kept
+PASSED tests/test_step3_preprocess.py::test_mask_all_zero_column_dropped
+PASSED tests/test_step3_preprocess.py::test_mask_custom_min_support
+PASSED tests/test_step3_preprocess.py::test_preprocessor_drops_zero_low_support_and_test_only_columns
+PASSED tests/test_step3_preprocess.py::test_mask_ignores_test_rows
+PASSED tests/test_step3_preprocess.py::test_dropped_column_cannot_produce_large_zscore_on_test
+PASSED tests/test_step3_preprocess.py::test_constant_nonzero_column_does_not_create_nan_or_inf
+PASSED tests/test_step3_preprocess.py::test_nan_in_input_raises_or_yields_finite_output
+PASSED tests/test_step3_preprocess.py::test_real_data_split_has_no_year_overlap_and_matching_columns
+======================== 38 passed, 1 warning in 5.24s ========================
 ```

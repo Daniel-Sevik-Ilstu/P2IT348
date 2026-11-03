@@ -297,5 +297,10 @@ def test_real_data_split_has_no_year_overlap_and_matching_columns(real_data_dir)
     assert set(np.unique(s["years_train"])) == {2014, 2015, 2016}
     assert set(np.unique(s["years_test"])) == {2017, 2018, 2019, 2020, 2021}
     assert s["X_train"].shape[1] == s["X_test"].shape[1] <= 1848
-    assert np.allclose(s["X_train"].mean(axis=0), 0.0, atol=1e-3)
+    # Scaled values are clipped to +-10 (PLAN.md), which shifts rare columns' training
+    # means by up to ~0.02. Tolerance 0.05 allows that shift with margin, while still
+    # catching a scaler that was not fit on the training rows.
+    assert np.abs(s["X_train"].mean(axis=0)).max() < 0.05
+    assert np.abs(s["X_train"]).max() <= 10.0
+    assert np.abs(s["X_test"]).max() <= 10.0
     assert s["X_train"].dtype == np.float32
